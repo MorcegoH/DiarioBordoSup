@@ -5,8 +5,9 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, BarChart3, ClipboardList, RefreshCw, Sparkles, Clock, Download } from 'lucide-react';
-import { SupabaseBadge } from './SupabaseBadge';
+import { ShieldCheck, BarChart3, ClipboardList, RefreshCw, Sparkles, Clock, Download, Database, CheckCircle2, ServerOff } from 'lucide-react';
+import { dbService, DbHealthStatus } from '../services/dbService';
+import { DatabaseErrorModal } from './DatabaseErrorModal';
 import { Ocorrencia, ResumoPassagem } from '../types';
 
 interface HeaderProps {
@@ -33,6 +34,36 @@ export const Header: React.FC<HeaderProps> = React.memo(({
   onDataSynced
 }) => {
   const [timeString, setTimeString] = useState<string>('');
+  const [healthStatus, setHealthStatus] = useState<DbHealthStatus>(dbService.getHealthStatus());
+  const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setTimeString(
+        now.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) +
+        ' • ' +
+        now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      );
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Atualiza o estado da saúde do banco quando as ocorrências mudam
+  useEffect(() => {
+    setHealthStatus(dbService.getHealthStatus());
+  }, [ocorrencias, passagens]);
+
+  const handleRetryConnection = async () => {
+    const updatedHealth = await dbService.checkConnection();
+    setHealthStatus(updatedHealth);
+    if (updatedHealth.isConnected && onDataSynced) {
+      onDataSynced();
+      setIsErrorModalOpen(false);
+    }
+  };
 
   useEffect(() => {
     const updateTime = () => {
@@ -67,11 +98,35 @@ export const Header: React.FC<HeaderProps> = React.memo(({
                 <span className="hidden sm:inline-block px-2.5 py-0.5 text-xs font-semibold bg-emerald-800 text-emerald-200 rounded-full border border-emerald-600">
                   Inside Sales Ops
                 </span>
-                <SupabaseBadge 
-                  ocorrencias={ocorrencias} 
-                  passagens={passagens} 
-                  onDataSynced={onDataSynced} 
-                />
+                {/* Tag de Status de Conexão */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!healthStatus.isConnected) {
+                      setIsErrorModalOpen(true);
+                    }
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border shadow-xs transition-all select-none ${
+                    healthStatus.isConnected
+                      ? 'bg-emerald-900/80 text-emerald-100 border-emerald-500/50 cursor-default'
+                      : 'bg-red-950/90 text-red-100 border-red-500/60 hover:bg-red-900 cursor-pointer animate-pulse'
+                  }`}
+                  title={
+                    healthStatus.isConnected
+                      ? 'Conexão ativa com o banco de dados'
+                      : 'Clique para visualizar a causa do erro e o código da falha'
+                  }
+                >
+                  <Database className="w-3.5 h-3.5" />
+                  <span>
+                    {healthStatus.isConnected ? 'Conectado' : 'Off-line'}
+                  </span>
+                  {healthStatus.isConnected ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
+                  ) : (
+                    <ServerOff className="w-3.5 h-3.5 text-red-300" />
+                  )}
+                </button>
               </div>
               <p className="text-xs sm:text-sm text-emerald-100/90 font-medium mt-0.5">
                 Gestão Operacional de Vendas • Gerente: <strong className="text-white">Heder Santos</strong>
@@ -160,6 +215,14 @@ export const Header: React.FC<HeaderProps> = React.memo(({
           </button>
         </nav>
       </div>
+
+      {/* Modal de Erro do Banco de Dados (exibido apenas quando off-line e acionado pelo usuário) */}
+      <DatabaseErrorModal
+        isOpen={isErrorModalOpen}
+        onClose={() => setIsErrorModalOpen(false)}
+        healthStatus={healthStatus}
+        onRetryConnection={handleRetryConnection}
+      />
     </header>
   );
 });

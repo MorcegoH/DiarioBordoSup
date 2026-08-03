@@ -63,6 +63,22 @@ function mapPassagemToDB(item: ResumoPassagem) {
 }
 
 // Auxiliares LocalStorage
+export interface DbHealthStatus {
+  isConnected: boolean;
+  errorCode: string | null;
+  errorMessage: string | null;
+  errorDetails: string | null;
+  lastChecked: string;
+}
+
+let lastHealthStatus: DbHealthStatus = {
+  isConnected: isSupabaseConfigured,
+  errorCode: isSupabaseConfigured ? null : 'ERR_CONFIG_MISSING',
+  errorMessage: isSupabaseConfigured ? null : 'As variáveis de ambiente do banco de dados não foram configuradas.',
+  errorDetails: isSupabaseConfigured ? null : 'As variáveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY não contêm valores válidos no ambiente.',
+  lastChecked: new Date().toISOString()
+};
+
 function getLocalOcorrencias(): Ocorrencia[] {
   try {
     const saved = localStorage.getItem(LOCAL_KEY_OCORRENCIAS);
@@ -108,6 +124,53 @@ function setLocalPassagens(data: ResumoPassagem[]) {
 export const dbService = {
   isConfigured: isSupabaseConfigured,
 
+  getHealthStatus(): DbHealthStatus {
+    return lastHealthStatus;
+  },
+
+  async checkConnection(): Promise<DbHealthStatus> {
+    if (!isSupabaseConfigured || !supabase) {
+      lastHealthStatus = {
+        isConnected: false,
+        errorCode: 'ERR_ENV_MISSING',
+        errorMessage: 'Variáveis de conexão não configuradas.',
+        errorDetails: 'As chaves VITE_SUPABASE_URL e/ou VITE_SUPABASE_ANON_KEY não foram preenchidas no arquivo .env.',
+        lastChecked: new Date().toISOString()
+      };
+      return lastHealthStatus;
+    }
+
+    try {
+      const { error } = await supabase.from('ocorrencias').select('id').limit(1);
+      if (error) {
+        lastHealthStatus = {
+          isConnected: false,
+          errorCode: error.code || 'ERR_DATABASE_RESPONSE',
+          errorMessage: error.message || 'Erro de resposta do servidor de banco de dados.',
+          errorDetails: error.details || error.hint || 'Permissão negada ou estrutura de tabela não encontrada.',
+          lastChecked: new Date().toISOString()
+        };
+      } else {
+        lastHealthStatus = {
+          isConnected: true,
+          errorCode: null,
+          errorMessage: null,
+          errorDetails: null,
+          lastChecked: new Date().toISOString()
+        };
+      }
+    } catch (err: any) {
+      lastHealthStatus = {
+        isConnected: false,
+        errorCode: 'ERR_NETWORK_FAILED',
+        errorMessage: err?.message || 'Falha de comunicação de rede com o servidor.',
+        errorDetails: 'Não foi possível se comunicar com o serviço. Verifique sua conexão com a internet ou as permissões de acesso.',
+        lastChecked: new Date().toISOString()
+      };
+    }
+    return lastHealthStatus;
+  },
+
   // --- OCORRÊNCIAS ---
   async getOcorrencias(): Promise<Ocorrencia[]> {
     if (isSupabaseConfigured && supabase) {
@@ -119,16 +182,38 @@ export const dbService = {
 
         if (error) {
           console.warn('Erro ao carregar ocorrencias do Supabase, usando LocalStorage:', error.message);
+          lastHealthStatus = {
+            isConnected: false,
+            errorCode: error.code || 'PGRST_ERROR',
+            errorMessage: error.message || 'Erro ao consultar a tabela de ocorrências.',
+            errorDetails: error.details || error.hint || 'Falha ao recuperar dados do banco de dados.',
+            lastChecked: new Date().toISOString()
+          };
           return getLocalOcorrencias();
         }
+
+        lastHealthStatus = {
+          isConnected: true,
+          errorCode: null,
+          errorMessage: null,
+          errorDetails: null,
+          lastChecked: new Date().toISOString()
+        };
 
         if (data) {
           const list = data.map(mapOcorrenciaFromDB);
           setLocalOcorrencias(list); // Mantém cache sincronizado
           return list;
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Falha na requisição ao Supabase:', err);
+        lastHealthStatus = {
+          isConnected: false,
+          errorCode: 'ERR_FETCH_EXCEPTION',
+          errorMessage: err?.message || 'Falha na conexão de rede com o banco de dados.',
+          errorDetails: 'A requisição foi interrompida ou não obteve resposta do servidor remoto.',
+          lastChecked: new Date().toISOString()
+        };
       }
     }
     return getLocalOcorrencias();
