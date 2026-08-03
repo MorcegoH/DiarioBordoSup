@@ -4,56 +4,71 @@
  * Utiliza Recharts para gráficos de gestão à vista e relatórios executivos para Sales Ops.
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Ocorrencia } from '../types';
 import { detectCategoryAnomalies } from '../utils/statisticalAnalysis';
 import { 
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend, AreaChart, Area
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend
 } from 'recharts';
 import { 
-  BarChart3, AlertOctagon, TrendingUp, CheckCircle, ShieldAlert, Cpu, 
-  Layers, Users, HelpCircle, Activity, Sparkles, AlertTriangle, ArrowUpRight
+  BarChart3, AlertOctagon, CheckCircle, 
+  ShieldAlert, Activity, Sparkles, TrendingUp
 } from 'lucide-react';
 
 interface AnalyticsDashboardProps {
   ocorrencias: Ocorrencia[];
 }
 
-export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ ocorrencias }) => {
-  // Análise Z-Score
-  const anomalias = detectCategoryAnomalies(ocorrencias);
-  const anomaliasCriticas = anomalias.filter(a => a.isOutlier);
+export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = React.memo(({ ocorrencias }) => {
+  // Análise de Anomalias Memoizada
+  const anomalias = useMemo(() => detectCategoryAnomalies(ocorrencias), [ocorrencias]);
+  const anomaliasCriticas = useMemo(() => anomalias.filter(a => a.isOutlier), [anomalias]);
 
-  // Métrica KPIs
-  const total = ocorrencias.length;
-  const criticos = ocorrencias.filter(o => o.impacto === 'Crítico').length;
-  const resolvidos = ocorrencias.filter(o => o.status === 'Resolvido').length;
-  const taxaResolução = total > 0 ? Math.round((resolvidos / total) * 100) : 0;
+  // Métrica KPIs Memoizada
+  const { total, criticos, resolvidos, taxaResolução } = useMemo(() => {
+    const tot = ocorrencias.length;
+    let crit = 0;
+    let res = 0;
 
-  // Distribuição por Categoria para gráfico de barras
-  const categoriasCount: Record<string, number> = {};
-  ocorrencias.forEach(o => {
-    categoriasCount[o.categoria] = (categoriasCount[o.categoria] || 0) + 1;
-  });
-
-  const chartDataCategoria = Object.entries(categoriasCount).map(([categoria, total]) => ({
-    categoria,
-    total
-  }));
-
-  // Distribuição por Impacto para gráfico de pizza (Donut)
-  const impactosCount: Record<string, number> = { Baixo: 0, Médio: 0, Crítico: 0 };
-  ocorrencias.forEach(o => {
-    if (impactosCount[o.impacto] !== undefined) {
-      impactosCount[o.impacto]++;
+    for (let i = 0; i < tot; i++) {
+      if (ocorrencias[i].impacto === 'Crítico') crit++;
+      if (ocorrencias[i].status === 'Resolvido') res++;
     }
-  });
 
-  const chartDataImpacto = [
-    { name: 'Baixo', value: impactosCount['Baixo'], color: '#10b981' },
-    { name: 'Médio', value: impactosCount['Médio'], color: '#f59e0b' },
-    { name: 'Crítico', value: impactosCount['Crítico'], color: '#ef4444' }
-  ].filter(d => d.value > 0);
+    const taxa = tot > 0 ? Math.round((res / tot) * 100) : 0;
+    return { total: tot, criticos: crit, resolvidos: res, taxaResolução: taxa };
+  }, [ocorrencias]);
+
+  // Distribuição por Categoria para gráfico de barras Memoizada
+  const chartDataCategoria = useMemo(() => {
+    const categoriasCount: Record<string, number> = {};
+    for (let i = 0; i < ocorrencias.length; i++) {
+      const cat = ocorrencias[i].categoria;
+      categoriasCount[cat] = (categoriasCount[cat] || 0) + 1;
+    }
+
+    return Object.entries(categoriasCount).map(([categoria, totalCount]) => ({
+      categoria,
+      total: totalCount
+    }));
+  }, [ocorrencias]);
+
+  // Distribuição por Impacto para gráfico de pizza (Donut) Memoizada
+  const chartDataImpacto = useMemo(() => {
+    const impactosCount: Record<string, number> = { Baixo: 0, Médio: 0, Crítico: 0 };
+    for (let i = 0; i < ocorrencias.length; i++) {
+      const imp = ocorrencias[i].impacto;
+      if (impactosCount[imp] !== undefined) {
+        impactosCount[imp]++;
+      }
+    }
+
+    return [
+      { name: 'Baixo', value: impactosCount['Baixo'], color: '#10b981' },
+      { name: 'Médio', value: impactosCount['Médio'], color: '#f59e0b' },
+      { name: 'Crítico', value: impactosCount['Crítico'], color: '#ef4444' }
+    ].filter(d => d.value > 0);
+  }, [ocorrencias]);
 
   return (
     <div className="space-y-6">
@@ -242,4 +257,4 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ ocorrenc
 
     </div>
   );
-};
+});

@@ -4,7 +4,7 @@
  * Integra persistência em Supabase com fallback gracioso em LocalStorage.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Ocorrencia, ResumoPassagem, Status } from './types';
 import { INITIAL_MOCK_OCORRENCIAS, INITIAL_MOCK_PASSAGENS } from './data/mockData';
 import { dbService } from './services/dbService';
@@ -22,7 +22,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Carrega os dados iniciais do Supabase ou do LocalStorage
-  const loadInitialData = async () => {
+  const loadInitialData = useCallback(async () => {
     setIsLoading(true);
     try {
       const [fetchedOcorrencias, fetchedPassagens] = await Promise.all([
@@ -36,56 +36,63 @@ export default function App() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadInitialData();
-  }, []);
+  }, [loadInitialData]);
 
   // Handlers sincronizados com o dbService
-  const handleAddOcorrencia = async (nova: Ocorrencia) => {
+  const handleAddOcorrencia = useCallback(async (nova: Ocorrencia) => {
     setOcorrencias((prev) => [nova, ...prev]);
     await dbService.addOcorrencia(nova);
-  };
+  }, []);
 
-  const handleDeleteOcorrencia = async (id: string) => {
+  const handleDeleteOcorrencia = useCallback(async (id: string) => {
     setOcorrencias((prev) => prev.filter((o) => o.id !== id));
     await dbService.deleteOcorrencia(id);
-  };
+  }, []);
 
-  const handleUpdateStatus = async (id: string, newStatus: Status) => {
+  const handleUpdateStatus = useCallback(async (id: string, newStatus: Status) => {
     setOcorrencias((prev) =>
       prev.map((o) => (o.id === id ? { ...o, status: newStatus } : o))
     );
     await dbService.updateStatusOcorrencia(id, newStatus);
-  };
+  }, []);
 
-  const handleUpdateOcorrencia = async (updated: Ocorrencia) => {
+  const handleUpdateOcorrencia = useCallback(async (updated: Ocorrencia) => {
     setOcorrencias((prev) =>
       prev.map((o) => (o.id === updated.id ? updated : o))
     );
     await dbService.updateOcorrencia(updated);
-  };
+  }, []);
 
-  const handleSavePassagem = async (novaPassagem: ResumoPassagem) => {
+  const handleSavePassagem = useCallback(async (novaPassagem: ResumoPassagem) => {
     setPassagens((prev) => [novaPassagem, ...prev]);
     await dbService.addPassagem(novaPassagem);
-  };
+  }, []);
 
-  const handleResetData = () => {
-    if (window.confirm('Deseja restaurar os dados de exemplo padrão?')) {
-      setOcorrencias(INITIAL_MOCK_OCORRENCIAS);
-      setPassagens(INITIAL_MOCK_PASSAGENS);
-      localStorage.setItem('diario_bordo_ocorrencias_v1', JSON.stringify(INITIAL_MOCK_OCORRENCIAS));
-      localStorage.setItem('diario_bordo_passagens_v1', JSON.stringify(INITIAL_MOCK_PASSAGENS));
+  const handleResetData = useCallback(async () => {
+    if (window.confirm('Deseja limpar todos os registros e zerar completamente o sistema (Banco e LocalStorage)?')) {
+      setOcorrencias([]);
+      setPassagens([]);
+      await dbService.clearAllData();
     }
-  };
+  }, []);
 
-  const handleExportCSV = () => {
+  const handleExportCSV = useCallback(() => {
     exportToCSV(ocorrencias);
-  };
+  }, [ocorrencias]);
 
-  const totalCriticos = ocorrencias.filter((o) => o.impacto === 'Crítico' && o.status !== 'Resolvido').length;
+  const totalCriticos = useMemo(() => {
+    let count = 0;
+    for (let i = 0; i < ocorrencias.length; i++) {
+      if (ocorrencias[i].impacto === 'Crítico' && ocorrencias[i].status !== 'Resolvido') {
+        count++;
+      }
+    }
+    return count;
+  }, [ocorrencias]);
 
   return (
     <div className="min-h-screen bg-[#f4f7f6] text-[#333333] flex flex-col font-sans">

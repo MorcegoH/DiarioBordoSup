@@ -79,24 +79,29 @@ export function detectCategoryAnomalies(ocorrencias: Ocorrencia[]): AnomaliaZSco
     'Comercial & Objeções'
   ];
 
-  // Contagem por categoria
-  const counts: Record<string, number> = {};
-  categoriasPossiveis.forEach(cat => counts[cat] = 0);
+  // Contagem por categoria otimizada
+  const counts: Record<string, number> = {
+    'Sistemas & Ferramentas': 0,
+    'Qualidade de Leads & Mídia': 0,
+    'Processos & SLA': 0,
+    'Pessoas & Performance': 0,
+    'Comercial & Objeções': 0
+  };
 
-  ocorrencias.forEach(oc => {
-    if (counts[oc.categoria] !== undefined) {
-      counts[oc.categoria]++;
-    } else {
-      counts[oc.categoria] = (counts[oc.categoria] || 0) + 1;
-    }
-  });
+  for (let i = 0; i < ocorrencias.length; i++) {
+    const cat = ocorrencias[i].categoria;
+    counts[cat] = (counts[cat] || 0) + 1;
+  }
 
   const values = Object.values(counts);
   const mean = calculateMean(values);
   const stdDev = calculateStandardDeviation(values, mean);
 
-  const results: AnomaliaZScore[] = Object.entries(counts).map(([categoria, quantidade]) => {
-    // Se o desvio padrão for zero (todos os valores iguais), Z-score é 0
+  const results: AnomaliaZScore[] = [];
+  const entries = Object.entries(counts);
+
+  for (let i = 0; i < entries.length; i++) {
+    const [categoria, quantidade] = entries[i];
     const zScore = stdDev === 0 ? 0 : Number(((quantidade - mean) / stdDev).toFixed(2));
     
     let nivelAlerta: 'Normal' | 'Atenção' | 'Anomalia Crítica' = 'Normal';
@@ -113,7 +118,7 @@ export function detectCategoryAnomalies(ocorrencias: Ocorrencia[]): AnomaliaZSco
       mensagem = `ATENÇÃO: Desvio moderado detectado (${zScore} desvios acima da média). Acompanhar operação.`;
     }
 
-    return {
+    results.push({
       categoria,
       quantidade,
       mediaEsperada: Number(mean.toFixed(1)),
@@ -122,8 +127,8 @@ export function detectCategoryAnomalies(ocorrencias: Ocorrencia[]): AnomaliaZSco
       isOutlier,
       nivelAlerta,
       mensagem
-    };
-  });
+    });
+  }
 
   return results.sort((a, b) => b.zScore - a.zScore);
 }

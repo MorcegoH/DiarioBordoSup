@@ -68,12 +68,12 @@ function getLocalOcorrencias(): Ocorrencia[] {
     const saved = localStorage.getItem(LOCAL_KEY_OCORRENCIAS);
     if (saved) {
       const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed)) return parsed;
     }
   } catch (e) {
     console.error('Erro ao carregar ocorrencias locais:', e);
   }
-  return INITIAL_MOCK_OCORRENCIAS;
+  return [];
 }
 
 function setLocalOcorrencias(data: Ocorrencia[]) {
@@ -89,12 +89,12 @@ function getLocalPassagens(): ResumoPassagem[] {
     const saved = localStorage.getItem(LOCAL_KEY_PASSAGENS);
     if (saved) {
       const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed)) return parsed;
     }
   } catch (e) {
     console.error('Erro ao carregar passagens locais:', e);
   }
-  return INITIAL_MOCK_PASSAGENS;
+  return [];
 }
 
 function setLocalPassagens(data: ResumoPassagem[]) {
@@ -122,13 +122,10 @@ export const dbService = {
           return getLocalOcorrencias();
         }
 
-        if (data && data.length > 0) {
+        if (data) {
           const list = data.map(mapOcorrenciaFromDB);
           setLocalOcorrencias(list); // Mantém cache sincronizado
           return list;
-        } else {
-          // Se a tabela estiver vazia, retorna os dados locais ou iniciais
-          return getLocalOcorrencias();
         }
       } catch (err) {
         console.error('Falha na requisição ao Supabase:', err);
@@ -213,12 +210,10 @@ export const dbService = {
           return getLocalPassagens();
         }
 
-        if (data && data.length > 0) {
+        if (data) {
           const list = data.map(mapPassagemFromDB);
           setLocalPassagens(list);
           return list;
-        } else {
-          return getLocalPassagens();
         }
       } catch (err) {
         console.error('Falha na requisição ao Supabase:', err);
@@ -244,6 +239,22 @@ export const dbService = {
   },
 
   // --- RESTAURAR DADOS / SEED NO SUPABASE ---
+  async clearAllData(): Promise<void> {
+    setLocalOcorrencias([]);
+    setLocalPassagens([]);
+    localStorage.removeItem(LOCAL_KEY_OCORRENCIAS);
+    localStorage.removeItem(LOCAL_KEY_PASSAGENS);
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('ocorrencias').delete().neq('id', '___none___');
+        await supabase.from('resumos_passagem').delete().neq('id', '___none___');
+      } catch (err) {
+        console.error('Erro ao limpar Supabase:', err);
+      }
+    }
+  },
+
   async seedSupabase(ocorrencias: Ocorrencia[], passagens: ResumoPassagem[]): Promise<{ success: boolean; message: string }> {
     if (!isSupabaseConfigured || !supabase) {
       return { success: false, message: 'Supabase não configurado. Verifique as variáveis de ambiente.' };

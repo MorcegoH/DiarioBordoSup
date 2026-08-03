@@ -4,7 +4,7 @@
  * Apresenta tabela responsiva e cartões com badges coloridas, ações de edição, alteração de status e exclusão.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Ocorrencia, FiltrosOcorrencia, Status, Impacto, Categoria } from '../types';
 import { formatBrazilianDate, exportToCSV } from '../utils/statisticalAnalysis';
 import { 
@@ -20,7 +20,7 @@ interface OccurrenceHistoryProps {
   onUpdateOcorrencia: (updated: Ocorrencia) => void;
 }
 
-export const OccurrenceHistory: React.FC<OccurrenceHistoryProps> = ({
+export const OccurrenceHistory: React.FC<OccurrenceHistoryProps> = React.memo(({
   ocorrencias,
   onDeleteOcorrencia,
   onUpdateStatus,
@@ -38,7 +38,7 @@ export const OccurrenceHistory: React.FC<OccurrenceHistoryProps> = ({
     supervisor: ''
   });
 
-  const handleResetFiltros = () => {
+  const handleResetFiltros = useCallback(() => {
     setFiltros({
       busca: '',
       categoria: '',
@@ -46,23 +46,27 @@ export const OccurrenceHistory: React.FC<OccurrenceHistoryProps> = ({
       status: '',
       supervisor: ''
     });
-  };
+  }, []);
 
-  // Filtragem de dados
-  const ocorrenciasFiltradas = ocorrencias.filter((oc) => {
-    const matchBusca = 
-      !filtros.busca ||
-      oc.descricao.toLowerCase().includes(filtros.busca.toLowerCase()) ||
-      oc.acaoTomada.toLowerCase().includes(filtros.busca.toLowerCase()) ||
-      oc.supervisor.toLowerCase().includes(filtros.busca.toLowerCase());
+  // Filtragem de dados otimizada com useMemo
+  const ocorrenciasFiltradas = useMemo(() => {
+    const buscaLower = filtros.busca.trim().toLowerCase();
 
-    const matchCategoria = !filtros.categoria || oc.categoria === filtros.categoria;
-    const matchImpacto = !filtros.impacto || oc.impacto === filtros.impacto;
-    const matchStatus = !filtros.status || oc.status === filtros.status;
-    const matchSupervisor = !filtros.supervisor || oc.supervisor === filtros.supervisor;
+    return ocorrencias.filter((oc) => {
+      const matchBusca = 
+        !buscaLower ||
+        oc.descricao.toLowerCase().includes(buscaLower) ||
+        oc.acaoTomada.toLowerCase().includes(buscaLower) ||
+        oc.supervisor.toLowerCase().includes(buscaLower);
 
-    return matchBusca && matchCategoria && matchImpacto && matchStatus && matchSupervisor;
-  });
+      const matchCategoria = !filtros.categoria || oc.categoria === filtros.categoria;
+      const matchImpacto = !filtros.impacto || oc.impacto === filtros.impacto;
+      const matchStatus = !filtros.status || oc.status === filtros.status;
+      const matchSupervisor = !filtros.supervisor || oc.supervisor === filtros.supervisor;
+
+      return matchBusca && matchCategoria && matchImpacto && matchStatus && matchSupervisor;
+    });
+  }, [ocorrencias, filtros]);
 
   // Badges auxiliares para impacto
   const getImpactoBadge = (impacto: Impacto) => {
@@ -553,4 +557,4 @@ export const OccurrenceHistory: React.FC<OccurrenceHistoryProps> = ({
 
     </div>
   );
-};
+});

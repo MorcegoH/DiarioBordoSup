@@ -13,7 +13,7 @@ interface OccurrenceFormProps {
   defaultSupervisor?: string;
 }
 
-export const OccurrenceForm: React.FC<OccurrenceFormProps> = ({
+export const OccurrenceForm: React.FC<OccurrenceFormProps> = React.memo(({
   onAddOcorrencia,
   defaultSupervisor = 'Debora Rodrigues'
 }) => {
@@ -230,4 +230,4 @@ export const OccurrenceForm: React.FC<OccurrenceFormProps> = ({
       </form>
     </div>
   );
-};
+});

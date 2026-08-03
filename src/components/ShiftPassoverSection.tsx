@@ -4,12 +4,12 @@
  * Consolida as ocorrências do dia e os comentários do supervisor em texto formatado para WhatsApp/Slack.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Ocorrencia, ResumoPassagem } from '../types';
 import { formatBrazilianDate } from '../utils/statisticalAnalysis';
 import { 
-  Sparkles, Copy, Check, Send, FileText, CheckCircle2, AlertTriangle, 
-  Clock, Share2, MessageSquare, ShieldCheck, User, Calendar
+  Sparkles, Copy, Check, FileText, CheckCircle2, AlertTriangle, 
+  MessageSquare, User, Calendar
 } from 'lucide-react';
 
 interface ShiftPassoverSectionProps {
@@ -19,7 +19,7 @@ interface ShiftPassoverSectionProps {
   defaultSupervisor?: string;
 }
 
-export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = ({
+export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.memo(({
   ocorrencias,
   passagens,
   onSavePassagem,
@@ -31,13 +31,13 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = ({
   const [relatorioGeradoText, setRelatorioGeradoText] = useState<string | null>(null);
   const [copiedToClipboard, setCopiedToClipboard] = useState<boolean>(false);
 
-  // Filtrar ocorrências do dia de hoje
-  const dataHojeISO = new Date().toISOString().split('T')[0];
-  const ocorrenciasHoje = ocorrencias.filter((oc) => {
-    return oc.dataHora.startsWith(dataHojeISO);
-  });
+  // Filtrar ocorrências do dia de hoje com useMemo
+  const dataHojeISO = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const ocorrenciasHoje = useMemo(() => {
+    return ocorrencias.filter((oc) => oc.dataHora.startsWith(dataHojeISO));
+  }, [ocorrencias, dataHojeISO]);
 
-  const generateReportText = (
+  const generateReportText = useCallback((
     sup: string,
     funcionou: string,
     pendente: string,
@@ -86,7 +86,7 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = ({
     text += `_Relatório gerado via Sistema de Supervisão Sales Ops_`;
 
     return text;
-  };
+  }, []);
 
   const handleGerarRelatorio = (e: React.FormEvent) => {
     e.preventDefault();
@@ -307,4 +307,4 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = ({
 
     </div>
   );
-};
+});

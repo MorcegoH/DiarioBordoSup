@@ -15,7 +15,7 @@ interface SupabaseBadgeProps {
   onDataSynced?: () => void;
 }
 
-export const SupabaseBadge: React.FC<SupabaseBadgeProps> = ({
+export const SupabaseBadge: React.FC<SupabaseBadgeProps> = React.memo(({
   ocorrencias,
   passagens,
   onDataSynced
@@ -107,20 +107,15 @@ CREATE POLICY "Permitir exclusao publica de passagens" ON public.resumos_passage
             ? 'bg-emerald-900/80 text-emerald-100 border-emerald-500/50 hover:bg-emerald-800'
             : 'bg-amber-950/80 text-amber-200 border-amber-600/50 hover:bg-amber-900'
         }`}
-        title="Clique para ver o status e instruções do Banco de Dados Supabase"
+        title="Clique para ver o status e instruções do Banco de Dados"
       >
         <Database className="w-3.5 h-3.5" />
         <span>
-          {isSupabaseConfigured ? 'Supabase Conectado' : 'Modo Local (Supabase Guia)'}
+          {isSupabaseConfigured ? 'Conectado' : 'Modo Local'}
         </span>
-        {isSupabaseConfigured ? (
-          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
-        ) : (
-          <AlertTriangle className="w-3.5 h-3.5 text-amber-300" />
-        )}
       </button>
 
-      {/* Modal de Configuração e Guia do Supabase */}
+      {/* Modal de Configuração e Guia do Banco de Dados */}
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
           <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-gray-200 overflow-hidden text-gray-800">
@@ -132,7 +127,7 @@ CREATE POLICY "Permitir exclusao publica de passagens" ON public.resumos_passage
                   <Server className="w-6 h-6 text-emerald-300" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold">Banco de Dados Supabase</h3>
+                  <h3 className="text-lg font-bold">Banco de Dados em Nuvem</h3>
                   <p className="text-xs text-emerald-100">
                     Estrutura de Tabelas & Passo a Passo de Conexão
                   </p>
@@ -164,14 +159,14 @@ CREATE POLICY "Permitir exclusao publica de passagens" ON public.resumos_passage
                   <div className="space-y-1">
                     <p className="font-semibold text-sm">
                       {isSupabaseConfigured 
-                        ? 'Variáveis do Supabase identificadas e ativas!' 
+                        ? 'Variáveis do banco de dados identificadas e ativas!' 
                         : 'A aplicação está operando em Modo Local (LocalStorage).'
                       }
                     </p>
                     <p className="text-xs leading-relaxed">
                       {isSupabaseConfigured
-                        ? 'Sua aplicação está conectada ao Supabase. Todos os registros novos e atualizações serão salvos em nuvem.'
-                        : 'Você pode usar a aplicação normalmente em modo offline/local. Para salvar na nuvem com o Supabase, siga as etapas abaixo.'
+                        ? 'Sua aplicação está conectada ao Banco de Dados em nuvem. Todos os registros novos e atualizações serão salvos.'
+                        : 'Você pode usar a aplicação normalmente em modo offline/local. Para salvar na nuvem, siga as etapas abaixo.'
                       }
                     </p>
                   </div>
@@ -180,7 +175,7 @@ CREATE POLICY "Permitir exclusao publica de passagens" ON public.resumos_passage
                 {isSupabaseConfigured && (
                   <div className="mt-4 pt-3 border-t border-emerald-200/80 flex flex-wrap items-center justify-between gap-2">
                     <span className="text-xs text-emerald-800 font-medium">
-                      Deseja sincronizar os dados atuais da tela para o banco Supabase?
+                      Deseja sincronizar os dados atuais da tela para o banco de dados?
                     </span>
                     <button
                       onClick={handleSeedSupabase}
@@ -188,7 +183,7 @@ CREATE POLICY "Permitir exclusao publica de passagens" ON public.resumos_passage
                       className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
                     >
                       <Database className="w-3.5 h-3.5" />
-                      {isSeeding ? 'Enviando...' : 'Popular Dados no Supabase'}
+                      {isSeeding ? 'Enviando...' : 'Popular Dados no Banco'}
                     </button>
                   </div>
                 )}
@@ -262,4 +257,4 @@ CREATE POLICY "Permitir exclusao publica de passagens" ON public.resumos_passage
       )}
     </>
   );
-};
+});
