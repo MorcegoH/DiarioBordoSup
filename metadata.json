@@ -1,0 +1,6 @@
+{
+  "name": "Diário de Bordo - Supervisão Inside Sales",
+  "description": "Aplicação Web SPA para Gestão de Vendas, Registro de Ocorrências, Análise BI com Z-Score e Passagem de Bastão para Supervisão.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
