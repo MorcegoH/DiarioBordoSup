@@ -89,7 +89,7 @@ export const Header: React.FC<HeaderProps> = React.memo(({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           
-          {/* Title & Brand - Link para Homepage */}
+          {/* Title & Brand */}
           <div className="flex items-center space-x-3">
             <a
               href="/"
@@ -98,56 +98,63 @@ export const Header: React.FC<HeaderProps> = React.memo(({
                 setActiveTab('ocorrencias');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className="flex items-center space-x-3 group hover:opacity-95 transition-opacity cursor-pointer text-left"
+              className="p-2.5 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20 hover:bg-white/20 transition-colors cursor-pointer"
               title="Ir para a Página Inicial (Diário de Bordo)"
             >
-              <div className="p-2.5 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20 group-hover:bg-white/20 transition-colors">
-                <ShieldCheck className="w-8 h-8 text-emerald-300" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
+              <ShieldCheck className="w-8 h-8 text-emerald-300" />
+            </a>
+            <div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <a
+                  href="/"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setActiveTab('ocorrencias');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="group cursor-pointer text-left"
+                  title="Ir para a Página Inicial (Diário de Bordo)"
+                >
                   <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white group-hover:text-emerald-100 transition-colors">
                     Diário de Bordo - Supervisão
                   </h1>
-                  <span className="hidden sm:inline-block px-2.5 py-0.5 text-xs font-semibold bg-emerald-800 text-emerald-200 rounded-full border border-emerald-600">
-                    Inside Sales Ops
-                  </span>
-                </div>
-                <p className="text-xs sm:text-sm text-emerald-100/90 font-medium mt-0.5">
-                  Gestão Operacional de Vendas • Gerente: <strong className="text-white">Heder Santos</strong>
-                </p>
-              </div>
-            </a>
+                </a>
 
-            {/* Tag de Status de Conexão */}
-            <button
-              type="button"
-              onClick={() => {
-                if (!healthStatus.isConnected) {
-                  setIsErrorModalOpen(true);
-                }
-              }}
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border shadow-xs transition-all select-none ${
-                healthStatus.isConnected
-                  ? 'bg-emerald-900/80 text-emerald-100 border-emerald-500/50 cursor-default'
-                  : 'bg-red-950/90 text-red-100 border-red-500/60 hover:bg-red-900 cursor-pointer animate-pulse'
-              }`}
-              title={
-                healthStatus.isConnected
-                  ? 'Conexão ativa com o banco de dados'
-                  : 'Clique para visualizar a causa do erro e o código da falha'
-              }
-            >
-              <Database className="w-3.5 h-3.5" />
-              <span>
-                {healthStatus.isConnected ? 'Conectado' : 'Off-line'}
-              </span>
-              {healthStatus.isConnected ? (
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
-              ) : (
-                <ServerOff className="w-3.5 h-3.5 text-red-300" />
-              )}
-            </button>
+                {/* Tag de Status de Conexão alinhada ao título */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!healthStatus.isConnected) {
+                      setIsErrorModalOpen(true);
+                    }
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border shadow-xs transition-all select-none ${
+                    healthStatus.isConnected
+                      ? 'bg-emerald-900/80 text-emerald-100 border-emerald-500/50 cursor-default'
+                      : 'bg-red-950/90 text-red-100 border-red-500/60 hover:bg-red-900 cursor-pointer animate-pulse'
+                  }`}
+                  title={
+                    healthStatus.isConnected
+                      ? 'Conexão ativa com o banco de dados'
+                      : 'Clique para visualizar a causa do erro e o código da falha'
+                  }
+                >
+                  <Database className="w-3.5 h-3.5" />
+                  <span>
+                    {healthStatus.isConnected ? 'Conectado' : 'Off-line'}
+                  </span>
+                  {healthStatus.isConnected ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
+                  ) : (
+                    <ServerOff className="w-3.5 h-3.5 text-red-300" />
+                  )}
+                </button>
+              </div>
+
+              <p className="text-xs sm:text-sm text-emerald-100/90 font-medium mt-0.5">
+                Gestão Operacional de Vendas • Gerente: <strong className="text-white">Heder Santos</strong>
+              </p>
+            </div>
           </div>
 
 
