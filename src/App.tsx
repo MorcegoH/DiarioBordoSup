@@ -22,25 +22,12 @@ export default function App() {
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>(INITIAL_MOCK_OCORRENCIAS);
   const [passagens, setPassagens] = useState<ResumoPassagem[]>(INITIAL_MOCK_PASSAGENS);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  
-  // Estado do Modo Escuro (Dark Mode)
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
-    const saved = localStorage.getItem('diario_bordo_theme');
-    return saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
-  });
 
+  // Garantir tema claro original permanentemente
   useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('diario_bordo_theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('diario_bordo_theme', 'light');
-    }
-  }, [isDarkMode]);
-
-  const handleToggleDarkMode = useCallback(() => {
-    setIsDarkMode((prev) => !prev);
+    document.documentElement.classList.remove('dark');
+    document.body.classList.remove('dark');
+    localStorage.setItem('diario_bordo_theme', 'light');
   }, []);
 
   // Carrega os dados iniciais do Supabase ou do LocalStorage
@@ -123,7 +110,7 @@ export default function App() {
   }, [ocorrencias]);
 
   return (
-    <div className="min-h-screen bg-[#f4f7f6] text-[#333333] flex flex-col font-sans">
+    <div className="min-h-screen bg-[#f4f7f6] text-[#333333] flex flex-col font-sans transition-colors duration-200">
       
       {/* SEÇÃO 1: Cabeçalho com logo, título e status do Supabase */}
       <Header
@@ -136,8 +123,6 @@ export default function App() {
         onResetData={handleResetData}
         onExportCSV={handleExportCSV}
         onDataSynced={loadInitialData}
-        isDarkMode={isDarkMode}
-        onToggleDarkMode={handleToggleDarkMode}
       />
 
       {/* Main Container */}
@@ -176,12 +161,12 @@ export default function App() {
       </main>
 
       {/* Footer Corporativo */}
-      <footer className="bg-white border-t border-gray-200 mt-12 py-4">
-        <div className="max-w-7xl mx-auto px-4 text-center text-xs text-gray-500 font-medium">
+      <footer className="bg-white dark:bg-[#1a1b1e] border-t border-gray-200 dark:border-[#2b2e36] mt-12 py-4 transition-colors duration-200">
+        <div className="max-w-7xl mx-auto px-4 text-center text-xs text-gray-500 dark:text-gray-400 font-medium">
           <p>
             Diário de Bordo - Supervisão Inside Sales • Sales Ops Intelligence System © {new Date().getFullYear()}
           </p>
-          <p className="mt-1 text-[11px] text-gray-400">
+          <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
             Dashboard BI • Integração Supabase PostgreSQL & Exportação para Excel/CSV
           </p>
         </div>
