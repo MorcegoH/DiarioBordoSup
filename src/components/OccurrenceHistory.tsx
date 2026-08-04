@@ -13,6 +13,8 @@ import {
   LayoutGrid, ListFilter, RotateCcw, X, Download
 } from 'lucide-react';
 
+import { verifyAdminAuthorization, sanitizeTextInput } from '../utils/security';
+
 interface OccurrenceHistoryProps {
   ocorrencias: Ocorrencia[];
   onDeleteOcorrencia: (id: string) => void;
@@ -38,6 +40,15 @@ export const OccurrenceHistory: React.FC<OccurrenceHistoryProps> = React.memo(({
     supervisor: ''
   });
 
+  const handleConfirmDelete = useCallback((id: string) => {
+    const senhaInput = window.prompt('Confirmação de Segurança: Digite a senha de autorização para excluir este registro:');
+    if (verifyAdminAuthorization(senhaInput)) {
+      onDeleteOcorrencia(id);
+    } else if (senhaInput !== null) {
+      alert('Senha incorreta! A exclusão não foi autorizada.');
+    }
+  }, [onDeleteOcorrencia]);
+
   const handleResetFiltros = useCallback(() => {
     setFiltros({
       busca: '',
@@ -47,8 +58,6 @@ export const OccurrenceHistory: React.FC<OccurrenceHistoryProps> = React.memo(({
       supervisor: ''
     });
   }, []);
-
-  // Filtragem de dados otimizada com useMemo
   const ocorrenciasFiltradas = useMemo(() => {
     const buscaLower = filtros.busca.trim().toLowerCase();
 
@@ -301,7 +310,20 @@ export const OccurrenceHistory: React.FC<OccurrenceHistoryProps> = React.memo(({
 
                   {/* Status */}
                   <td className="px-4 py-3.5 whitespace-nowrap">
-                    {getStatusBadge(oc.status)}
+                    <div>
+                      {getStatusBadge(oc.status)}
+                      {oc.status === 'Resolvido' && oc.dataHoraConclusao && (
+                        <div className="text-[10px] text-emerald-700 font-medium mt-1 flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3 text-emerald-600" />
+                          <span>Concluído: {formatBrazilianDate(oc.dataHoraConclusao)}</span>
+                        </div>
+                      )}
+                      {oc.duracaoMinutos && oc.duracaoMinutos > 0 ? (
+                        <div className="text-[10px] text-gray-500 font-mono mt-0.5">
+                          Tempo: {oc.duracaoMinutos >= 60 ? `${(oc.duracaoMinutos / 60).toFixed(1)}h` : `${oc.duracaoMinutos} min`}
+                        </div>
+                      ) : null}
+                    </div>
                   </td>
 
                   {/* Ações */}
@@ -330,12 +352,8 @@ export const OccurrenceHistory: React.FC<OccurrenceHistoryProps> = React.memo(({
 
                       {/* Botão Excluir */}
                       <button
-                        onClick={() => {
-                          if (window.confirm('Tem certeza que deseja excluir esta ocorrência do diário de bordo?')) {
-                            onDeleteOcorrencia(oc.id);
-                          }
-                        }}
-                        title="Excluir Ocorrência"
+                        onClick={() => handleConfirmDelete(oc.id)}
+                        title="Excluir Ocorrência (Exige Senha)"
                         className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-md transition-colors"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -378,7 +396,14 @@ export const OccurrenceHistory: React.FC<OccurrenceHistoryProps> = React.memo(({
                     <User className="w-3.5 h-3.5 text-emerald-700" />
                     {oc.supervisor}
                   </span>
-                  {getStatusBadge(oc.status)}
+                  <div className="text-right">
+                    {getStatusBadge(oc.status)}
+                    {oc.status === 'Resolvido' && oc.dataHoraConclusao && (
+                      <div className="text-[10px] text-emerald-700 font-semibold mt-0.5">
+                        Resolvido: {formatBrazilianDate(oc.dataHoraConclusao)}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="mb-2">
@@ -419,11 +444,8 @@ export const OccurrenceHistory: React.FC<OccurrenceHistoryProps> = React.memo(({
                     <Edit3 className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={() => {
-                      if (window.confirm('Excluir esta ocorrência?')) {
-                        onDeleteOcorrencia(oc.id);
-                      }
-                    }}
+                    onClick={() => handleConfirmDelete(oc.id)}
+                    title="Excluir Ocorrência (Exige Senha)"
                     className="p-1 bg-red-50 hover:bg-red-100 text-red-600 rounded"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -455,7 +477,14 @@ export const OccurrenceHistory: React.FC<OccurrenceHistoryProps> = React.memo(({
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                onUpdateOcorrencia(editingOcorrencia);
+                const sanitizedItem: Ocorrencia = {
+                  ...editingOcorrencia,
+                  supervisor: sanitizeTextInput(editingOcorrencia.supervisor, 100),
+                  descricao: sanitizeTextInput(editingOcorrencia.descricao, 2000),
+                  acaoTomada: sanitizeTextInput(editingOcorrencia.acaoTomada, 2000),
+                  duracaoMinutos: Math.max(0, Number(editingOcorrencia.duracaoMinutos || 0))
+                };
+                onUpdateOcorrencia(sanitizedItem);
                 setEditingOcorrencia(null);
               }}
               className="space-y-4 text-xs"
@@ -515,7 +544,15 @@ export const OccurrenceHistory: React.FC<OccurrenceHistoryProps> = React.memo(({
                   <label className="block font-bold text-gray-700 mb-1">Status</label>
                   <select
                     value={editingOcorrencia.status}
-                    onChange={(e) => setEditingOcorrencia({ ...editingOcorrencia, status: e.target.value as Status })}
+                    onChange={(e) => {
+                      const newSt = e.target.value as Status;
+                      const isRes = newSt === 'Resolvido';
+                      setEditingOcorrencia({
+                        ...editingOcorrencia,
+                        status: newSt,
+                        dataHoraConclusao: isRes ? (editingOcorrencia.dataHoraConclusao || new Date().toISOString()) : undefined
+                      });
+                    }}
                     className="w-full px-3 py-2 border rounded-md"
                   >
                     <option value="Pendente">Pendente</option>
@@ -524,6 +561,33 @@ export const OccurrenceHistory: React.FC<OccurrenceHistoryProps> = React.memo(({
                   </select>
                 </div>
               </div>
+
+              {editingOcorrencia.status === 'Resolvido' && (
+                <div className="grid grid-cols-2 gap-3 bg-emerald-50/50 p-3 rounded-lg border border-emerald-100">
+                  <div>
+                    <label className="block font-bold text-emerald-900 mb-1">Data / Hora Conclusão</label>
+                    <input
+                      type="datetime-local"
+                      value={editingOcorrencia.dataHoraConclusao ? new Date(editingOcorrencia.dataHoraConclusao).toISOString().slice(0, 16) : ''}
+                      onChange={(e) => {
+                        const val = e.target.value ? new Date(e.target.value).toISOString() : new Date().toISOString();
+                        setEditingOcorrencia({ ...editingOcorrencia, dataHoraConclusao: val });
+                      }}
+                      className="w-full px-3 py-1.5 border rounded-md bg-white text-gray-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-emerald-900 mb-1">Duração Impacto (minutos)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editingOcorrencia.duracaoMinutos ?? 0}
+                      onChange={(e) => setEditingOcorrencia({ ...editingOcorrencia, duracaoMinutos: Number(e.target.value) })}
+                      className="w-full px-3 py-1.5 border rounded-md bg-white text-gray-800"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block font-bold text-gray-700 mb-1">Ação Tomada</label>

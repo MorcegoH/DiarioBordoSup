@@ -7,6 +7,7 @@
 import React, { useState } from 'react';
 import { Categoria, Impacto, Status, Ocorrencia } from '../types';
 import { PlusCircle, CheckCircle2, User, Tag, FileText, Activity, Wrench, ShieldAlert } from 'lucide-react';
+import { sanitizeTextInput } from '../utils/security';
 
 interface OccurrenceFormProps {
   onAddOcorrencia: (ocorrencia: Ocorrencia) => void;
@@ -28,31 +29,39 @@ export const OccurrenceForm: React.FC<OccurrenceFormProps> = React.memo(({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!supervisor.trim()) {
+    const cleanSupervisor = sanitizeTextInput(supervisor, 100);
+    const cleanDescricao = sanitizeTextInput(descricao, 2000);
+    const cleanAcaoTomada = sanitizeTextInput(acaoTomada, 2000);
+
+    if (!cleanSupervisor) {
       alert('Por favor, informe o Supervisor Responsável.');
       return;
     }
 
-    if (!descricao.trim()) {
+    if (!cleanDescricao) {
       alert('Por favor, preencha a Descrição da Ocorrência.');
       return;
     }
 
-    if (!acaoTomada.trim()) {
+    if (!cleanAcaoTomada) {
       alert('Por favor, informe a Ação Tomada.');
       return;
     }
 
+    const agora = new Date().toISOString();
+    const isResolvido = status === 'Resolvido';
+
     const novaOcorrencia: Ocorrencia = {
       id: 'oc-' + Date.now().toString(36),
-      dataHora: new Date().toISOString(),
-      supervisor: supervisor.trim(),
+      dataHora: agora,
+      dataHoraConclusao: isResolvido ? agora : undefined,
+      supervisor: cleanSupervisor,
       categoria,
-      descricao: descricao.trim(),
+      descricao: cleanDescricao,
       impacto,
-      acaoTomada: acaoTomada.trim(),
+      acaoTomada: cleanAcaoTomada,
       status,
-      duracaoMinutos: status === 'Resolvido' ? 15 : 0
+      duracaoMinutos: isResolvido ? 15 : 0
     };
 
     onAddOcorrencia(novaOcorrencia);

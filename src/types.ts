@@ -21,6 +21,7 @@ export type Status = 'Pendente' | 'Em Análise' | 'Resolvido';
 export interface Ocorrencia {
   id: string;
   dataHora: string; // ISO string de data e hora do registro
+  dataHoraConclusao?: string; // ISO string de data e hora de conclusão/resolução
   supervisor: string;
   categoria: Categoria;
   descricao: string;

@@ -7,6 +7,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { Ocorrencia, ResumoPassagem } from '../types';
 import { formatBrazilianDate } from '../utils/statisticalAnalysis';
+import { sanitizeTextInput } from '../utils/security';
 import { 
   Sparkles, Copy, Check, FileText, CheckCircle2, AlertTriangle, 
   MessageSquare, User, Calendar
@@ -91,21 +92,25 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
   const handleGerarRelatorio = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!oQueFuncionou.trim() && !oQueFicaPendente.trim()) {
+    const cleanFuncionou = sanitizeTextInput(oQueFuncionou, 2500);
+    const cleanPendente = sanitizeTextInput(oQueFicaPendente, 2500);
+    const cleanSupervisor = sanitizeTextInput(supervisor, 100);
+
+    if (!cleanFuncionou && !cleanPendente) {
       alert('Por favor, informe ao menos um resumo do que funcionou ou do que fica pendente.');
       return;
     }
 
-    const report = generateReportText(supervisor, oQueFuncionou, oQueFicaPendente, ocorrenciasHoje);
+    const report = generateReportText(cleanSupervisor, cleanFuncionou, cleanPendente, ocorrenciasHoje);
     setRelatorioGeradoText(report);
 
     // Salvar registro de passagem
     const novaPassagem: ResumoPassagem = {
       id: 'pass-' + Date.now().toString(36),
       data: dataHojeISO,
-      supervisor,
-      oQueFuncionou: oQueFuncionou.trim(),
-      oQueFicaPendente: oQueFicaPendente.trim(),
+      supervisor: cleanSupervisor,
+      oQueFuncionou: cleanFuncionou,
+      oQueFicaPendente: cleanPendente,
       dataHoraCriacao: new Date().toISOString()
     };
 

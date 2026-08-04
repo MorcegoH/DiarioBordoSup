@@ -12,7 +12,7 @@ import {
 } from 'recharts';
 import { 
   BarChart3, AlertOctagon, CheckCircle, 
-  ShieldAlert, Activity, Sparkles, TrendingUp
+  ShieldAlert, Activity, Sparkles, TrendingUp, Clock, Timer, Hourglass
 } from 'lucide-react';
 
 interface AnalyticsDashboardProps {
@@ -25,18 +25,37 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = React.memo(
   const anomaliasCriticas = useMemo(() => anomalias.filter(a => a.isOutlier), [anomalias]);
 
   // Métrica KPIs Memoizada
-  const { total, criticos, resolvidos, taxaResolução } = useMemo(() => {
+  const { total, criticos, resolvidos, taxaResolução, totalTempoMinutos, mttrMinutos } = useMemo(() => {
     const tot = ocorrencias.length;
     let crit = 0;
     let res = 0;
+    let somaMinutos = 0;
 
     for (let i = 0; i < tot; i++) {
-      if (ocorrencias[i].impacto === 'Crítico') crit++;
-      if (ocorrencias[i].status === 'Resolvido') res++;
+      const oc = ocorrencias[i];
+      if (oc.impacto === 'Crítico') crit++;
+      if (oc.status === 'Resolvido') res++;
+
+      let min = oc.duracaoMinutos || 0;
+      if (!min && oc.dataHoraConclusao && oc.dataHora) {
+        min = Math.max(0, Math.round((new Date(oc.dataHoraConclusao).getTime() - new Date(oc.dataHora).getTime()) / 60000));
+      } else if (!min && oc.status !== 'Resolvido' && oc.dataHora) {
+        min = Math.max(0, Math.round((Date.now() - new Date(oc.dataHora).getTime()) / 60000));
+      }
+      somaMinutos += min;
     }
 
     const taxa = tot > 0 ? Math.round((res / tot) * 100) : 0;
-    return { total: tot, criticos: crit, resolvidos: res, taxaResolução: taxa };
+    const mttr = res > 0 ? Math.round(somaMinutos / res) : 0;
+
+    return { 
+      total: tot, 
+      criticos: crit, 
+      resolvidos: res, 
+      taxaResolução: taxa,
+      totalTempoMinutos: somaMinutos,
+      mttrMinutos: mttr
+    };
   }, [ocorrencias]);
 
   // Distribuição por Categoria para gráfico de barras Memoizada
@@ -51,6 +70,45 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = React.memo(
       categoria,
       total: totalCount
     }));
+  }, [ocorrencias]);
+
+  // Análise de Tempo de Impacto por Categoria Memoizada
+  const chartDataTempoImpacto = useMemo(() => {
+    const tempoPorCategoria: Record<string, { totalMinutos: number; count: number; criticosMin: number }> = {};
+
+    for (let i = 0; i < ocorrencias.length; i++) {
+      const oc = ocorrencias[i];
+      const cat = oc.categoria;
+
+      let min = oc.duracaoMinutos || 0;
+      if (!min && oc.dataHoraConclusao && oc.dataHora) {
+        min = Math.max(0, Math.round((new Date(oc.dataHoraConclusao).getTime() - new Date(oc.dataHora).getTime()) / 60000));
+      } else if (!min && oc.status !== 'Resolvido' && oc.dataHora) {
+        min = Math.max(0, Math.round((Date.now() - new Date(oc.dataHora).getTime()) / 60000));
+      }
+
+      if (!tempoPorCategoria[cat]) {
+        tempoPorCategoria[cat] = { totalMinutos: 0, count: 0, criticosMin: 0 };
+      }
+
+      tempoPorCategoria[cat].totalMinutos += min;
+      tempoPorCategoria[cat].count += 1;
+      if (oc.impacto === 'Crítico') {
+        tempoPorCategoria[cat].criticosMin += min;
+      }
+    }
+
+    return Object.entries(tempoPorCategoria).map(([categoria, data]) => {
+      const horas = Number((data.totalMinutos / 60).toFixed(1));
+      const mediaMinutos = data.count > 0 ? Math.round(data.totalMinutos / data.count) : 0;
+      return {
+        categoria,
+        horasImpacto: horas,
+        totalMinutos: data.totalMinutos,
+        mediaMinutos,
+        quantidade: data.count
+      };
+    }).sort((a, b) => b.horasImpacto - a.horasImpacto);
   }, [ocorrencias]);
 
   // Distribuição por Impacto para gráfico de pizza (Donut) Memoizada
@@ -74,7 +132,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = React.memo(
     <div className="space-y-6">
       
       {/* SEÇÃO KPI Cards Executivos */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         
         <div className="corporate-card p-4 flex items-center justify-between border-l-4 border-l-emerald-700">
           <div>
@@ -84,6 +142,19 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = React.memo(
           </div>
           <div className="p-3 bg-emerald-50 rounded-xl text-primary-green">
             <Activity className="w-6 h-6" />
+          </div>
+        </div>
+
+        <div className="corporate-card p-4 flex items-center justify-between border-l-4 border-l-amber-600">
+          <div>
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Tempo Total Impacto</p>
+            <h3 className="text-2xl font-extrabold text-amber-700 mt-1">
+              {totalTempoMinutos >= 60 ? `${(totalTempoMinutos / 60).toFixed(1)}h` : `${totalTempoMinutos} min`}
+            </h3>
+            <span className="text-[11px] text-amber-600 font-medium">Operação Paralisada/Afetada</span>
+          </div>
+          <div className="p-3 bg-amber-50 rounded-xl text-amber-600">
+            <Clock className="w-6 h-6" />
           </div>
         </div>
 
@@ -111,12 +182,96 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = React.memo(
 
         <div className="corporate-card p-4 flex items-center justify-between border-l-4 border-l-sky-600">
           <div>
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Detecção de Anomalias</p>
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Anomalias (Outliers)</p>
             <h3 className="text-2xl font-extrabold text-sky-800 mt-1">{anomaliasCriticas.length}</h3>
             <span className="text-[11px] text-sky-600 font-medium">Gargalos Preditivos</span>
           </div>
           <div className="p-3 bg-sky-50 rounded-xl text-sky-600">
             <TrendingUp className="w-6 h-6" />
+          </div>
+        </div>
+      </div>
+
+      {/* SEÇÃO ANALÍTICA: Impacto de Tempo Operacional por Categoria/Departamento */}
+      <div className="corporate-card p-5 border-l-4 border-l-amber-500 bg-white shadow-xs">
+        <div className="flex items-center justify-between pb-3 mb-4 border-b border-gray-100">
+          <div className="flex items-center space-x-2">
+            <div className="p-2 bg-amber-100 rounded-lg text-amber-800">
+              <Hourglass className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-gray-800 flex items-center gap-2">
+                Impacto Operacional: Tempo Total de Interrupção por Categoria (Horas)
+                <span className="text-xs font-semibold px-2 py-0.5 bg-amber-100 text-amber-900 rounded">
+                  Tempo Operacional Perdido
+                </span>
+              </h3>
+              <p className="text-xs text-gray-500">
+                Mede a duração total em horas que o departamento ficou parado ou impactado até a conclusão do problema.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Gráfico de Barras do Tempo de Impacto */}
+          <div className="lg:col-span-2 h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartDataTempoImpacto} margin={{ top: 10, right: 10, left: -10, bottom: 25 }}>
+                <XAxis 
+                  dataKey="categoria" 
+                  tick={{ fontSize: 10 }} 
+                  interval={0} 
+                  angle={-15} 
+                  textAnchor="end" 
+                />
+                <YAxis allowDecimals={true} tick={{ fontSize: 11 }} label={{ value: 'Horas', angle: -90, position: 'insideLeft', fontSize: 11 }} />
+                <Tooltip 
+                  formatter={(value: any, name: string) => [
+                    `${value} horas (${Math.round(Number(value) * 60)} min)`,
+                    'Impacto de Tempo'
+                  ]}
+                  contentStyle={{ backgroundColor: '#1e293b', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
+                />
+                <Bar dataKey="horasImpacto" name="Horas de Impacto" fill="#d97706" radius={[4, 4, 0, 0]}>
+                  {chartDataTempoImpacto.map((entry, index) => (
+                    <Cell key={`cell-tempo-${index}`} fill={index === 0 ? '#b45309' : '#f59e0b'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Tabela Resumo Analítica por Departamento */}
+          <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex flex-col justify-between">
+            <div>
+              <h4 className="text-xs font-bold uppercase text-gray-700 tracking-wider mb-3 flex items-center gap-1.5">
+                <Timer className="w-4 h-4 text-amber-700" />
+                Resumo de Duração por Categoria
+              </h4>
+              <div className="space-y-2.5 text-xs">
+                {chartDataTempoImpacto.length === 0 ? (
+                  <p className="text-gray-500 italic text-center py-4">Nenhum registro com tempo capturado.</p>
+                ) : (
+                  chartDataTempoImpacto.map((item) => (
+                    <div key={item.categoria} className="p-2 bg-white rounded border border-gray-200 flex justify-between items-center">
+                      <div>
+                        <span className="font-bold text-gray-800 block">{item.categoria}</span>
+                        <span className="text-[10px] text-gray-500">{item.quantidade} ocorrência(s) • Média: {item.mediaMinutos} min</span>
+                      </div>
+                      <span className="font-extrabold text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-200 text-xs">
+                        {item.horasImpacto}h
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="pt-3 mt-3 border-t border-gray-200 text-[11px] text-gray-600">
+              <span className="font-semibold text-gray-800">Tempo Médio de Solução (MTTR):</span>{' '}
+              <span className="font-bold text-emerald-800">{mttrMinutos} minutos</span>
+            </div>
           </div>
         </div>
       </div>

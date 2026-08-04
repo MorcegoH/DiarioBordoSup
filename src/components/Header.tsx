@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, BarChart3, ClipboardList, RefreshCw, Sparkles, Clock, Download, Database, CheckCircle2, ServerOff } from 'lucide-react';
+import { ShieldCheck, BarChart3, ClipboardList, RefreshCw, Sparkles, Clock, Download, Database, CheckCircle2, ServerOff, Moon, Sun } from 'lucide-react';
 import { dbService, DbHealthStatus } from '../services/dbService';
 import { DatabaseErrorModal } from './DatabaseErrorModal';
 import { Ocorrencia, ResumoPassagem } from '../types';
@@ -20,6 +20,8 @@ interface HeaderProps {
   onResetData: () => void;
   onExportCSV: () => void;
   onDataSynced?: () => void;
+  isDarkMode: boolean;
+  onToggleDarkMode: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = React.memo(({
@@ -31,7 +33,9 @@ export const Header: React.FC<HeaderProps> = React.memo(({
   passagens,
   onResetData,
   onExportCSV,
-  onDataSynced
+  onDataSynced,
+  isDarkMode,
+  onToggleDarkMode
 }) => {
   const [timeString, setTimeString] = useState<string>('');
   const [healthStatus, setHealthStatus] = useState<DbHealthStatus>(dbService.getHealthStatus());
@@ -154,6 +158,24 @@ export const Header: React.FC<HeaderProps> = React.memo(({
                   <span className="text-sm font-bold text-red-200">{totalCriticos}</span>
                 </div>
               )}
+
+              <button
+                onClick={onToggleDarkMode}
+                title={isDarkMode ? "Mudar para Modo Claro" : "Mudar para Modo Escuro"}
+                className="p-2 bg-emerald-900/90 hover:bg-emerald-800 text-amber-300 rounded-lg text-xs font-medium transition-all flex items-center gap-1 border border-emerald-600/60 shadow-xs cursor-pointer"
+              >
+                {isDarkMode ? (
+                  <>
+                    <Sun className="w-4 h-4 text-amber-300" />
+                    <span className="hidden sm:inline text-white">Claro</span>
+                  </>
+                ) : (
+                  <>
+                    <Moon className="w-4 h-4 text-emerald-200" />
+                    <span className="hidden sm:inline text-white">Escuro</span>
+                  </>
+                )}
+              </button>
 
               <button
                 onClick={onExportCSV}

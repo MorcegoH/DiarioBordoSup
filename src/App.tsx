@@ -15,11 +15,33 @@ import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { ShiftPassoverSection } from './components/ShiftPassoverSection';
 import { exportToCSV } from './utils/statisticalAnalysis';
 
+import { verifyAdminAuthorization } from './utils/security';
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<'ocorrencias' | 'dashboard' | 'passagem'>('ocorrencias');
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>(INITIAL_MOCK_OCORRENCIAS);
   const [passagens, setPassagens] = useState<ResumoPassagem[]>(INITIAL_MOCK_PASSAGENS);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  
+  // Estado do Modo Escuro (Dark Mode)
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem('diario_bordo_theme');
+    return saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  });
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('diario_bordo_theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('diario_bordo_theme', 'light');
+    }
+  }, [isDarkMode]);
+
+  const handleToggleDarkMode = useCallback(() => {
+    setIsDarkMode((prev) => !prev);
+  }, []);
 
   // Carrega os dados iniciais do Supabase ou do LocalStorage
   const loadInitialData = useCallback(async () => {
@@ -73,10 +95,16 @@ export default function App() {
   }, []);
 
   const handleResetData = useCallback(async () => {
-    if (window.confirm('Deseja limpar todos os registros e zerar completamente o sistema (Banco e LocalStorage)?')) {
-      setOcorrencias([]);
-      setPassagens([]);
-      await dbService.clearAllData();
+    const senhaInput = window.prompt('Confirmação de Segurança: Informe a senha de autorização para zerar o banco de dados e registros:');
+    if (verifyAdminAuthorization(senhaInput)) {
+      if (window.confirm('Tem certeza absoluta que deseja zerar todos os registros do sistema (Banco Supabase e LocalStorage)?')) {
+        setOcorrencias([]);
+        setPassagens([]);
+        await dbService.clearAllData();
+        alert('Todos os dados foram zerados com sucesso.');
+      }
+    } else if (senhaInput !== null) {
+      alert('Senha incorreta! Ação de exclusão/limpeza não autorizada.');
     }
   }, []);
 
@@ -108,6 +136,8 @@ export default function App() {
         onResetData={handleResetData}
         onExportCSV={handleExportCSV}
         onDataSynced={loadInitialData}
+        isDarkMode={isDarkMode}
+        onToggleDarkMode={handleToggleDarkMode}
       />
 
       {/* Main Container */}

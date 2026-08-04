@@ -7,6 +7,7 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { Ocorrencia, ResumoPassagem, Status } from '../types';
 import { INITIAL_MOCK_OCORRENCIAS, INITIAL_MOCK_PASSAGENS } from '../data/mockData';
+import { sanitizeTextInput } from '../utils/security';
 
 const LOCAL_KEY_OCORRENCIAS = 'diario_bordo_ocorrencias_v1';
 const LOCAL_KEY_PASSAGENS = 'diario_bordo_passagens_v1';
@@ -14,15 +15,16 @@ const LOCAL_KEY_PASSAGENS = 'diario_bordo_passagens_v1';
 // Mapeadores para conversão entre o banco (snake_case) e TypeScript (camelCase)
 function mapOcorrenciaFromDB(row: any): Ocorrencia {
   return {
-    id: row.id,
+    id: String(row.id || ''),
     dataHora: row.data_hora,
-    supervisor: row.supervisor,
+    dataHoraConclusao: row.data_hora_conclusao ?? undefined,
+    supervisor: sanitizeTextInput(row.supervisor || '', 100),
     categoria: row.categoria,
-    descricao: row.descricao,
+    descricao: sanitizeTextInput(row.descricao || '', 2000),
     impacto: row.impacto,
-    acaoTomada: row.acao_tomada,
+    acaoTomada: sanitizeTextInput(row.acao_tomada || '', 2000),
     status: row.status,
-    duracaoMinutos: row.duracao_minutos ?? 0
+    duracaoMinutos: Number(row.duracao_minutos ?? 0)
   };
 }
 
@@ -30,6 +32,7 @@ function mapOcorrenciaToDB(item: Ocorrencia) {
   return {
     id: item.id,
     data_hora: item.dataHora,
+    data_hora_conclusao: item.dataHoraConclusao || null,
     supervisor: item.supervisor,
     categoria: item.categoria,
     descricao: item.descricao,
@@ -251,14 +254,30 @@ export const dbService = {
     }
   },
 
-  async updateStatusOcorrencia(id: string, newStatus: Status): Promise<void> {
+  async updateStatusOcorrencia(id: string, newStatus: Status, dataHoraConclusao?: string): Promise<void> {
     const local = getLocalOcorrencias();
-    const atualizado = local.map((o) => (o.id === id ? { ...o, status: newStatus } : o));
+    let updatedItem: Ocorrencia | undefined;
+
+    const atualizado = local.map((o) => {
+      if (o.id === id) {
+        const isResolvido = newStatus === 'Resolvido';
+        const conclDate = isResolvido ? (dataHoraConclusao || o.dataHoraConclusao || new Date().toISOString()) : undefined;
+        let duracao = o.duracaoMinutos;
+        if (isResolvido && conclDate && o.dataHora) {
+          const diffMs = new Date(conclDate).getTime() - new Date(o.dataHora).getTime();
+          duracao = Math.max(0, Math.round(diffMs / 60000));
+        }
+        updatedItem = { ...o, status: newStatus, dataHoraConclusao: conclDate, duracaoMinutos: duracao };
+        return updatedItem;
+      }
+      return o;
+    });
     setLocalOcorrencias(atualizado);
 
-    if (isSupabaseConfigured && supabase) {
+    if (isSupabaseConfigured && supabase && updatedItem) {
       try {
-        const { error } = await supabase.from('ocorrencias').update({ status: newStatus }).eq('id', id);
+        const payload = mapOcorrenciaToDB(updatedItem);
+        const { error } = await supabase.from('ocorrencias').update(payload).eq('id', id);
         if (error) console.error('Erro ao atualizar status no Supabase:', error.message);
       } catch (err) {
         console.error('Erro ao conectar com Supabase:', err);
