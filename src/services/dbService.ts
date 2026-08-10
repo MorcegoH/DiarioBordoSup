@@ -141,7 +141,7 @@ export const dbService = {
   },
 
   /**
-   * Testa a conexão real com a tabela ocorrencias do Supabase
+   * Testa a conexão e permissões de Leitura e Escrita nas tabelas do Supabase
    */
   async checkConnection(): Promise<DbHealthStatus> {
     if (!isSupabaseConfigured || !supabase) {
@@ -156,34 +156,161 @@ export const dbService = {
     }
 
     try {
-      const { error } = await supabase.from('ocorrencias').select('id').limit(1);
-      if (error) {
+      // 1. Testa leitura na tabela de ocorrências
+      const { error: selectErr } = await supabase.from('ocorrencias').select('id').limit(1);
+      if (selectErr) {
+        let details = selectErr.details || selectErr.hint || `Código PostgREST: ${selectErr.code}`;
+        if (selectErr.code === '42P01') {
+          details = 'A tabela "ocorrencias" NÃO EXISTE no seu banco de dados Supabase. Execute o Script SQL no Editor SQL do Supabase.';
+        } else if (selectErr.code === '42501') {
+          details = 'Permissão RLS negada para leitura. Execute as políticas RLS no Editor SQL do Supabase.';
+        }
+
         lastHealthStatus = {
           isConnected: false,
-          errorCode: error.code || 'ERR_DATABASE_RESPONSE',
-          errorMessage: error.message || 'Erro ao consultar o servidor Supabase.',
-          errorDetails: error.details || error.hint || `Falha de permissão (RLS) ou tabela 'ocorrencias' não encontrada. Código HTTP/PostgREST: ${error.code}`,
+          errorCode: selectErr.code || 'ERR_DATABASE_RESPONSE',
+          errorMessage: selectErr.message || 'Erro ao consultar o servidor Supabase.',
+          errorDetails: details,
           lastChecked: new Date().toISOString()
         };
-      } else {
-        lastHealthStatus = {
-          isConnected: true,
-          errorCode: null,
-          errorMessage: null,
-          errorDetails: null,
-          lastChecked: new Date().toISOString()
-        };
+        return lastHealthStatus;
       }
+
+      // 2. Testa leitura na tabela de resumos_passagem
+      const { error: passErr } = await supabase.from('resumos_passagem').select('id').limit(1);
+      if (passErr) {
+        let details = passErr.details || passErr.hint || `Código PostgREST: ${passErr.code}`;
+        if (passErr.code === '42P01') {
+          details = 'A tabela "resumos_passagem" NÃO EXISTE no seu banco de dados Supabase. Execute o Script SQL para criar ambas as tabelas.';
+        }
+
+        lastHealthStatus = {
+          isConnected: false,
+          errorCode: passErr.code || 'ERR_MISSING_TABLE',
+          errorMessage: `A tabela 'resumos_passagem' não foi encontrada: ${passErr.message}`,
+          errorDetails: details,
+          lastChecked: new Date().toISOString()
+        };
+        return lastHealthStatus;
+      }
+
+      lastHealthStatus = {
+        isConnected: true,
+        errorCode: null,
+        errorMessage: null,
+        errorDetails: null,
+        lastChecked: new Date().toISOString()
+      };
     } catch (err: any) {
       lastHealthStatus = {
         isConnected: false,
         errorCode: 'ERR_NETWORK_FAILED',
         errorMessage: err?.message || 'Falha de comunicação de rede com o servidor Supabase.',
-        errorDetails: 'Não foi possível se comunicar com o endpoint do Supabase. Verifique sua conexão ou se a URL do projeto está correta.',
+        errorDetails: 'Não foi possível se comunicar com o endpoint do Supabase. Verifique sua conexão de internet ou a URL do projeto.',
         lastChecked: new Date().toISOString()
       };
     }
     return lastHealthStatus;
+  },
+
+  /**
+   * Executa um diagnóstico assertivo de Leitura, Escrita e Compatibilidade de Tipos
+   */
+  async runFullDatabaseDiagnostic(): Promise<{
+    canRead: boolean;
+    canWrite: boolean;
+    errorCode: string | null;
+    errorMessage: string | null;
+    errorDetails: string | null;
+    diagnosticMessage: string;
+  }> {
+    if (!isSupabaseConfigured || !supabase) {
+      return {
+        canRead: false,
+        canWrite: false,
+        errorCode: 'ERR_ENV_MISSING',
+        errorMessage: 'Variáveis de ambiente ausentes no projeto.',
+        errorDetails: 'Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.',
+        diagnosticMessage: 'Supabase não configurado no ambiente.'
+      };
+    }
+
+    try {
+      // Teste 1: Leitura na tabela ocorrencias
+      const { error: readErr } = await supabase.from('ocorrencias').select('id').limit(1);
+      if (readErr) {
+        let diagMsg = `Falha na leitura da tabela "ocorrencias" (${readErr.code}).`;
+        if (readErr.code === '42P01') {
+          diagMsg = 'A tabela "ocorrencias" não existe no banco de dados Supabase.';
+        } else if (readErr.code === '42501') {
+          diagMsg = 'Bloqueado por RLS (Row Level Security). Crie a política SELECT para anon.';
+        }
+
+        return {
+          canRead: false,
+          canWrite: false,
+          errorCode: readErr.code,
+          errorMessage: readErr.message,
+          errorDetails: readErr.details || readErr.hint || 'Verifique a estrutura do banco.',
+          diagnosticMessage: diagMsg
+        };
+      }
+
+      // Teste 2: Escrita de teste (Dummy Insert)
+      const testId = 'diag-test-' + Date.now();
+      const { error: writeErr } = await supabase.from('ocorrencias').insert([{
+        id: testId,
+        data_hora: new Date().toISOString(),
+        supervisor: 'Teste Diagnostico',
+        categoria: 'Sistemas & Ferramentas',
+        descricao: 'Registro temporario de teste de escrita',
+        impacto: 'Baixo',
+        acao_tomada: 'Teste de integridade',
+        status: 'Pendente',
+        duracao_minutos: 0
+      }]);
+
+      if (writeErr) {
+        let diagMsg = `Falha na gravação no Supabase (${writeErr.code}).`;
+        if (writeErr.code === '22P02') {
+          diagMsg = 'MOTIVO DA FALHA DE GRAVAÇÃO: A coluna "id" na tabela "ocorrencias" do Supabase foi criada como UUID ou INTEGER, mas a aplicação envia IDs em formato TEXTO (ex: "oc-xyz"). Solução: Execute "ALTER TABLE public.ocorrencias ALTER COLUMN id TYPE TEXT;" no Editor SQL do Supabase ou recrie as tabelas.';
+        } else if (writeErr.code === '42703') {
+          diagMsg = 'MOTIVO DA FALHA DE GRAVAÇÃO: Faltam colunas na tabela "ocorrencias" (ex: "duracao_minutos" ou "data_hora_conclusao"). Execute o Script SQL completo fornecido no modal.';
+        } else if (writeErr.code === '42501') {
+          diagMsg = 'MOTIVO DA FALHA DE GRAVAÇÃO: Bloqueio de RLS (Row Level Security) para a ação INSERT. Crie as políticas RLS para anon ou desabilite o RLS para a tabela.';
+        }
+
+        return {
+          canRead: true,
+          canWrite: false,
+          errorCode: writeErr.code,
+          errorMessage: writeErr.message,
+          errorDetails: writeErr.details || writeErr.hint || writeErr.message,
+          diagnosticMessage: diagMsg
+        };
+      }
+
+      // Limpar registro de teste
+      await supabase.from('ocorrencias').delete().eq('id', testId);
+
+      return {
+        canRead: true,
+        canWrite: true,
+        errorCode: null,
+        errorMessage: null,
+        errorDetails: null,
+        diagnosticMessage: 'O banco de dados Supabase está 100% operacional para Leitura e Escrita!'
+      };
+    } catch (err: any) {
+      return {
+        canRead: false,
+        canWrite: false,
+        errorCode: 'ERR_DIAGNOSTIC_EXCEPT',
+        errorMessage: err?.message || 'Exceção ao testar o banco de dados.',
+        errorDetails: String(err),
+        diagnosticMessage: 'Erro ao conectar ao Supabase.'
+      };
+    }
   },
 
   // --- OCORRÊNCIAS ---

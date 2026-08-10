@@ -16,10 +16,16 @@ interface DatabaseErrorModalProps {
   onSyncComplete?: () => void;
 }
 
-const SUPABASE_DDL_SQL = `-- Script SQL para Configuração do Supabase (Executar no SQL Editor do Supabase)
+const SUPABASE_DDL_SQL = `-- SCRIPT DE CRIAÇÃO LIMPA E SEGURA DAS TABELAS NO SUPABASE
+-- Copie e cole no SQL Editor do Supabase (https://supabase.com/dashboard)
+-- Este script recria as tabelas, ativa o RLS (Row Level Security) e define as políticas de segurança.
 
--- 1. Criar Tabela de Ocorrências
-CREATE TABLE IF NOT EXISTS public.ocorrencias (
+-- 1. APAGAR TABELAS ANTIGAS (OPCIONAL/SEGURO PARA RECRIAÇÃO)
+DROP TABLE IF EXISTS public.ocorrencias CASCADE;
+DROP TABLE IF EXISTS public.resumos_passagem CASCADE;
+
+-- 2. CRIAR TABELA DE OCORRÊNCIAS
+CREATE TABLE public.ocorrencias (
   id TEXT PRIMARY KEY,
   data_hora TIMESTAMPTZ NOT NULL,
   data_hora_conclusao TIMESTAMPTZ,
@@ -32,8 +38,8 @@ CREATE TABLE IF NOT EXISTS public.ocorrencias (
   duracao_minutos INTEGER DEFAULT 0
 );
 
--- 2. Criar Tabela de Passagem de Bastão (Fechamento)
-CREATE TABLE IF NOT EXISTS public.resumos_passagem (
+-- 3. CRIAR TABELA DE PASSAGEM DE BASTÃO / FECHAMENTO
+CREATE TABLE public.resumos_passagem (
   id TEXT PRIMARY KEY,
   data TEXT NOT NULL,
   supervisor TEXT NOT NULL,
@@ -42,11 +48,11 @@ CREATE TABLE IF NOT EXISTS public.resumos_passagem (
   data_hora_criacao TIMESTAMPTZ NOT NULL
 );
 
--- 3. Habilitar RLS (Row Level Security)
+-- 4. ATIVAR ROW LEVEL SECURITY (RLS) PARA SEGURANÇA
 ALTER TABLE public.ocorrencias ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.resumos_passagem ENABLE ROW LEVEL SECURITY;
 
--- 4. Criar Políticas de Permissões Anônimas (anon key)
+-- 5. POLÍTICAS DE SEGURANÇA RLS PARA A TABELA 'ocorrencias' (Chave Anônima / Anon)
 DROP POLICY IF EXISTS "Permitir leitura anonima ocorrencias" ON public.ocorrencias;
 CREATE POLICY "Permitir leitura anonima ocorrencias" ON public.ocorrencias FOR SELECT USING (true);
 
@@ -59,6 +65,7 @@ CREATE POLICY "Permitir atualizacao anonima ocorrencias" ON public.ocorrencias F
 DROP POLICY IF EXISTS "Permitir exclusao anonima ocorrencias" ON public.ocorrencias;
 CREATE POLICY "Permitir exclusao anonima ocorrencias" ON public.ocorrencias FOR DELETE USING (true);
 
+-- 6. POLÍTICAS DE SEGURANÇA RLS PARA A TABELA 'resumos_passagem' (Chave Anônima / Anon)
 DROP POLICY IF EXISTS "Permitir leitura anonima resumos" ON public.resumos_passagem;
 CREATE POLICY "Permitir leitura anonima resumos" ON public.resumos_passagem FOR SELECT USING (true);
 
@@ -86,12 +93,27 @@ export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
   const [copiedSql, setCopiedSql] = useState(false);
   const [activeTab, setActiveTab] = useState<'erro' | 'sql'>('erro');
 
+  const [diagResult, setDiagResult] = useState<{
+    canRead: boolean;
+    canWrite: boolean;
+    diagnosticMessage: string;
+    errorMessage?: string | null;
+  } | null>(null);
+  const [isRunningDiag, setIsRunningDiag] = useState(false);
+
   if (!isOpen) return null;
 
   const handleRetry = async () => {
     setIsRetrying(true);
     await onRetryConnection();
     setIsRetrying(false);
+  };
+
+  const handleRunDiagnostic = async () => {
+    setIsRunningDiag(true);
+    const res = await dbService.runFullDatabaseDiagnostic();
+    setDiagResult(res);
+    setIsRunningDiag(false);
   };
 
   const handleSyncPending = async () => {
@@ -182,7 +204,7 @@ export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-red-900 uppercase tracking-wider flex items-center gap-1.5">
                     <AlertOctagon className="w-4 h-4 text-red-600" />
-                    Código da Falha Retornada:
+                    Status da Conexão:
                   </span>
                   {healthStatus.errorCode && (
                     <button
@@ -206,8 +228,41 @@ export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
                 </div>
 
                 <div className="bg-gray-900 text-red-400 font-mono font-bold text-sm px-3 py-2 rounded-md border border-gray-800 flex items-center justify-between">
-                  <span>{healthStatus.errorCode || 'ERR_DESCONHECIDO'}</span>
+                  <span>{healthStatus.errorCode || (healthStatus.isConnected ? 'HTTP 200 OK (Apenas Leitura)' : 'ERR_DESCONHECIDO')}</span>
                 </div>
+              </div>
+
+              {/* Botão de Teste Completo de Escrita/Gravação */}
+              <div className="bg-blue-50 border border-blue-200 p-3.5 rounded-lg space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-blue-900 uppercase tracking-wider">
+                    Diagnóstico Completo de Gravação (INSERT):
+                  </span>
+                  <button
+                    onClick={handleRunDiagnostic}
+                    disabled={isRunningDiag}
+                    className="px-3 py-1 bg-blue-700 hover:bg-blue-800 text-white rounded text-xs font-bold transition-colors disabled:opacity-50"
+                  >
+                    {isRunningDiag ? 'Executando Teste...' : 'Testar Escrita Agora'}
+                  </button>
+                </div>
+                {diagResult && (
+                  <div className={`p-3 rounded text-xs font-medium border leading-relaxed ${
+                    diagResult.canWrite 
+                      ? 'bg-emerald-100 border-emerald-300 text-emerald-950 font-bold' 
+                      : 'bg-red-100 border-red-300 text-red-950'
+                  }`}>
+                    <p className="font-bold mb-1">
+                      {diagResult.canWrite ? '✅ Teste de Escrita com Sucesso!' : '❌ Falha Detectada no Teste de Escrita:'}
+                    </p>
+                    <p>{diagResult.diagnosticMessage}</p>
+                    {diagResult.errorMessage && (
+                      <p className="mt-1 font-mono text-[11px] opacity-80">
+                        Detalhes: {diagResult.errorMessage}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Mensagem e Detalhes do Erro */}

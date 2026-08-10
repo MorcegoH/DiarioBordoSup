@@ -32,7 +32,11 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
   const [oQueFicaPendente, setOQueFicaPendente] = useState<string>('');
   const [relatorioGeradoText, setRelatorioGeradoText] = useState<string | null>(null);
   const [copiedToClipboard, setCopiedToClipboard] = useState<boolean>(false);
-  const [saveStatus, setSaveStatus] = useState<{ type: 'supabase' | 'local' | null; message: string }>({ type: null, message: '' });
+  const [saveStatus, setSaveStatus] = useState<{
+    type: 'supabase' | 'local' | 'error' | null;
+    message: string;
+    errorDetail?: string;
+  }>({ type: null, message: '' });
 
   // Filtrar ocorrências do dia de hoje com useMemo
   const dataHojeISO = useMemo(() => new Date().toISOString().split('T')[0], []);
@@ -118,21 +122,27 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
 
     const result = await onSavePassagem(novaPassagem);
 
-    if (result && result.storage === 'supabase') {
+    if (result && result.storage === 'supabase' && result.success) {
       setSaveStatus({
         type: 'supabase',
         message: 'Fechamento de turno salvo no Supabase (Nuvem)!'
       });
+    } else if (result && result.error) {
+      setSaveStatus({
+        type: 'error',
+        message: 'Salvo apenas localmente. Erro no Supabase:',
+        errorDetail: result.error
+      });
     } else {
       setSaveStatus({
         type: 'local',
-        message: 'Fechamento de turno salvo no navegador! (Aguardando sincronização com Supabase)'
+        message: 'Fechamento de turno salvo no navegador! (Supabase não configurado)'
       });
     }
 
     setTimeout(() => {
       setSaveStatus({ type: null, message: '' });
-    }, 4500);
+    }, 7000);
   };
 
   const handleCopyToClipboard = (textToCopy: string) => {
@@ -174,6 +184,20 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
             <div className="flex items-center gap-2 bg-amber-600 text-white text-xs font-bold px-3.5 py-2 rounded-lg shadow-sm animate-pulse">
               <AlertTriangle className="w-4 h-4 text-amber-200" />
               <span>{saveStatus.message}</span>
+            </div>
+          )}
+
+          {saveStatus.type === 'error' && (
+            <div className="flex flex-col gap-1 bg-red-700 text-white text-xs font-medium px-3.5 py-2 rounded-lg shadow-sm">
+              <div className="flex items-center gap-2 font-bold">
+                <AlertTriangle className="w-4 h-4 text-red-200 shrink-0" />
+                <span>{saveStatus.message}</span>
+              </div>
+              {saveStatus.errorDetail && (
+                <p className="text-[11px] font-mono bg-red-900/80 p-1.5 rounded text-red-100 border border-red-500/50">
+                  {saveStatus.errorDetail}
+                </p>
+              )}
             </div>
           )}
         </div>

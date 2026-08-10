@@ -25,7 +25,11 @@ export const OccurrenceForm: React.FC<OccurrenceFormProps> = React.memo(({
   const [impacto, setImpacto] = useState<Impacto>('Baixo');
   const [acaoTomada, setAcaoTomada] = useState<string>('');
   const [status, setStatus] = useState<Status>('Pendente');
-  const [saveStatus, setSaveStatus] = useState<{ type: 'supabase' | 'local' | null; message: string }>({ type: null, message: '' });
+  const [saveStatus, setSaveStatus] = useState<{
+    type: 'supabase' | 'local' | 'error' | null;
+    message: string;
+    errorDetail?: string;
+  }>({ type: null, message: '' });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,15 +71,21 @@ export const OccurrenceForm: React.FC<OccurrenceFormProps> = React.memo(({
 
     const result = await onAddOcorrencia(novaOcorrencia);
 
-    if (result && result.storage === 'supabase') {
+    if (result && result.storage === 'supabase' && result.success) {
       setSaveStatus({
         type: 'supabase',
         message: 'Ocorrência salva com sucesso no Supabase (Nuvem)!'
       });
+    } else if (result && result.error) {
+      setSaveStatus({
+        type: 'error',
+        message: 'Salvo apenas no navegador. Erro na gravação do Supabase:',
+        errorDetail: result.error
+      });
     } else {
       setSaveStatus({
         type: 'local',
-        message: 'Salvo localmente no navegador! (Aguardando sincronização com o Supabase)'
+        message: 'Salvo localmente no navegador! (Supabase não configurado)'
       });
     }
 
@@ -87,7 +97,7 @@ export const OccurrenceForm: React.FC<OccurrenceFormProps> = React.memo(({
 
     setTimeout(() => {
       setSaveStatus({ type: null, message: '' });
-    }, 4500);
+    }, 7000);
   };
 
   return (
@@ -118,6 +128,20 @@ export const OccurrenceForm: React.FC<OccurrenceFormProps> = React.memo(({
           <div className="flex items-center gap-2 bg-amber-600 text-white text-xs font-bold px-3.5 py-2 rounded-lg shadow-sm animate-pulse">
             <AlertTriangle className="w-4 h-4 text-amber-200" />
             <span>{saveStatus.message}</span>
+          </div>
+        )}
+
+        {saveStatus.type === 'error' && (
+          <div className="flex flex-col gap-1 bg-red-700 text-white text-xs font-medium px-3.5 py-2 rounded-lg shadow-sm">
+            <div className="flex items-center gap-2 font-bold">
+              <ShieldAlert className="w-4 h-4 text-red-200 shrink-0" />
+              <span>{saveStatus.message}</span>
+            </div>
+            {saveStatus.errorDetail && (
+              <p className="text-[11px] font-mono bg-red-900/80 p-1.5 rounded text-red-100 border border-red-500/50">
+                {saveStatus.errorDetail}
+              </p>
+            )}
           </div>
         )}
       </div>
