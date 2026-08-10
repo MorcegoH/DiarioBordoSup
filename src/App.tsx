@@ -54,31 +54,31 @@ export default function App() {
   // Handlers sincronizados com o dbService
   const handleAddOcorrencia = useCallback(async (nova: Ocorrencia) => {
     setOcorrencias((prev) => [nova, ...prev]);
-    await dbService.addOcorrencia(nova);
+    return await dbService.addOcorrencia(nova);
   }, []);
 
   const handleDeleteOcorrencia = useCallback(async (id: string) => {
     setOcorrencias((prev) => prev.filter((o) => o.id !== id));
-    await dbService.deleteOcorrencia(id);
+    return await dbService.deleteOcorrencia(id);
   }, []);
 
   const handleUpdateStatus = useCallback(async (id: string, newStatus: Status) => {
     setOcorrencias((prev) =>
       prev.map((o) => (o.id === id ? { ...o, status: newStatus } : o))
     );
-    await dbService.updateStatusOcorrencia(id, newStatus);
+    return await dbService.updateStatusOcorrencia(id, newStatus);
   }, []);
 
   const handleUpdateOcorrencia = useCallback(async (updated: Ocorrencia) => {
     setOcorrencias((prev) =>
       prev.map((o) => (o.id === updated.id ? updated : o))
     );
-    await dbService.updateOcorrencia(updated);
+    return await dbService.updateOcorrencia(updated);
   }, []);
 
   const handleSavePassagem = useCallback(async (novaPassagem: ResumoPassagem) => {
     setPassagens((prev) => [novaPassagem, ...prev]);
-    await dbService.addPassagem(novaPassagem);
+    return await dbService.addPassagem(novaPassagem);
   }, []);
 
   const handleResetData = useCallback(async () => {

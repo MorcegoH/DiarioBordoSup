@@ -123,21 +123,13 @@ export const Header: React.FC<HeaderProps> = React.memo(({
                 {/* Tag de Status de Conexão alinhada ao título */}
                 <button
                   type="button"
-                  onClick={() => {
-                    if (!healthStatus.isConnected) {
-                      setIsErrorModalOpen(true);
-                    }
-                  }}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border shadow-xs transition-all select-none ${
+                  onClick={() => setIsErrorModalOpen(true)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border shadow-xs transition-all select-none cursor-pointer ${
                     healthStatus.isConnected
-                      ? 'bg-emerald-900/80 text-emerald-100 border-emerald-500/50 cursor-default'
-                      : 'bg-red-950/90 text-red-100 border-red-500/60 hover:bg-red-900 cursor-pointer animate-pulse'
+                      ? 'bg-emerald-900/80 text-emerald-100 border-emerald-500/50 hover:bg-emerald-800'
+                      : 'bg-red-950/90 text-red-100 border-red-500/60 hover:bg-red-900 animate-pulse'
                   }`}
-                  title={
-                    healthStatus.isConnected
-                      ? 'Conexão ativa com o banco de dados'
-                      : 'Clique para visualizar a causa do erro e o código da falha'
-                  }
+                  title="Clique para visualizar o diagnóstico de conexão, script SQL e sincronizar dados"
                 >
                   <Database className="w-3.5 h-3.5" />
                   <span>
@@ -241,12 +233,13 @@ export const Header: React.FC<HeaderProps> = React.memo(({
         </nav>
       </div>
 
-      {/* Modal de Erro do Banco de Dados (exibido apenas quando off-line e acionado pelo usuário) */}
+      {/* Modal de Erro do Banco de Dados (exibido quando acionado pelo usuário) */}
       <DatabaseErrorModal
         isOpen={isErrorModalOpen}
         onClose={() => setIsErrorModalOpen(false)}
         healthStatus={healthStatus}
         onRetryConnection={handleRetryConnection}
+        onSyncComplete={onDataSynced}
       />
     </header>
   );

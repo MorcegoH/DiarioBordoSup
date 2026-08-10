@@ -6,11 +6,12 @@
 
 import React, { useState } from 'react';
 import { Categoria, Impacto, Status, Ocorrencia } from '../types';
-import { PlusCircle, CheckCircle2, User, Tag, FileText, Activity, Wrench, ShieldAlert } from 'lucide-react';
+import { PlusCircle, CheckCircle2, User, Tag, FileText, Activity, Wrench, ShieldAlert, AlertTriangle } from 'lucide-react';
 import { sanitizeTextInput } from '../utils/security';
+import { DbOperationResult } from '../services/dbService';
 
 interface OccurrenceFormProps {
-  onAddOcorrencia: (ocorrencia: Ocorrencia) => void;
+  onAddOcorrencia: (ocorrencia: Ocorrencia) => Promise<DbOperationResult | void>;
   defaultSupervisor?: string;
 }
 
@@ -24,9 +25,9 @@ export const OccurrenceForm: React.FC<OccurrenceFormProps> = React.memo(({
   const [impacto, setImpacto] = useState<Impacto>('Baixo');
   const [acaoTomada, setAcaoTomada] = useState<string>('');
   const [status, setStatus] = useState<Status>('Pendente');
-  const [showSuccessToast, setShowSuccessToast] = useState<boolean>(false);
+  const [saveStatus, setSaveStatus] = useState<{ type: 'supabase' | 'local' | null; message: string }>({ type: null, message: '' });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const cleanSupervisor = sanitizeTextInput(supervisor, 100);
@@ -64,7 +65,19 @@ export const OccurrenceForm: React.FC<OccurrenceFormProps> = React.memo(({
       duracaoMinutos: isResolvido ? 15 : 0
     };
 
-    onAddOcorrencia(novaOcorrencia);
+    const result = await onAddOcorrencia(novaOcorrencia);
+
+    if (result && result.storage === 'supabase') {
+      setSaveStatus({
+        type: 'supabase',
+        message: 'Ocorrência salva com sucesso no Supabase (Nuvem)!'
+      });
+    } else {
+      setSaveStatus({
+        type: 'local',
+        message: 'Salvo localmente no navegador! (Aguardando sincronização com o Supabase)'
+      });
+    }
 
     // Reset form fields except supervisor
     setDescricao('');
@@ -72,11 +85,9 @@ export const OccurrenceForm: React.FC<OccurrenceFormProps> = React.memo(({
     setImpacto('Baixo');
     setStatus('Pendente');
 
-    // Show confirmation
-    setShowSuccessToast(true);
     setTimeout(() => {
-      setShowSuccessToast(false);
-    }, 3500);
+      setSaveStatus({ type: null, message: '' });
+    }, 4500);
   };
 
   return (
@@ -96,10 +107,17 @@ export const OccurrenceForm: React.FC<OccurrenceFormProps> = React.memo(({
           </div>
         </div>
 
-        {showSuccessToast && (
-          <div className="flex items-center gap-2 bg-emerald-600 text-white text-xs font-semibold px-3 py-1.5 rounded-md shadow-sm animate-bounce">
-            <CheckCircle2 className="w-4 h-4" />
-            <span>Ocorrência registrada com sucesso!</span>
+        {saveStatus.type === 'supabase' && (
+          <div className="flex items-center gap-2 bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-lg shadow-sm animate-bounce">
+            <CheckCircle2 className="w-4 h-4 text-emerald-200" />
+            <span>{saveStatus.message}</span>
+          </div>
+        )}
+
+        {saveStatus.type === 'local' && (
+          <div className="flex items-center gap-2 bg-amber-600 text-white text-xs font-bold px-3.5 py-2 rounded-lg shadow-sm animate-pulse">
+            <AlertTriangle className="w-4 h-4 text-amber-200" />
+            <span>{saveStatus.message}</span>
           </div>
         )}
       </div>

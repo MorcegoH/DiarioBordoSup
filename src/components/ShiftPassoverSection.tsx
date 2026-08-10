@@ -8,6 +8,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { Ocorrencia, ResumoPassagem } from '../types';
 import { formatBrazilianDate } from '../utils/statisticalAnalysis';
 import { sanitizeTextInput } from '../utils/security';
+import { DbOperationResult } from '../services/dbService';
 import { 
   Sparkles, Copy, Check, FileText, CheckCircle2, AlertTriangle, 
   MessageSquare, User, Calendar
@@ -16,7 +17,7 @@ import {
 interface ShiftPassoverSectionProps {
   ocorrencias: Ocorrencia[];
   passagens: ResumoPassagem[];
-  onSavePassagem: (passagem: ResumoPassagem) => void;
+  onSavePassagem: (passagem: ResumoPassagem) => Promise<DbOperationResult | void>;
   defaultSupervisor?: string;
 }
 
@@ -31,6 +32,7 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
   const [oQueFicaPendente, setOQueFicaPendente] = useState<string>('');
   const [relatorioGeradoText, setRelatorioGeradoText] = useState<string | null>(null);
   const [copiedToClipboard, setCopiedToClipboard] = useState<boolean>(false);
+  const [saveStatus, setSaveStatus] = useState<{ type: 'supabase' | 'local' | null; message: string }>({ type: null, message: '' });
 
   // Filtrar ocorrências do dia de hoje com useMemo
   const dataHojeISO = useMemo(() => new Date().toISOString().split('T')[0], []);
@@ -89,7 +91,7 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
     return text;
   }, []);
 
-  const handleGerarRelatorio = (e: React.FormEvent) => {
+  const handleGerarRelatorio = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const cleanFuncionou = sanitizeTextInput(oQueFuncionou, 2500);
@@ -114,7 +116,23 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
       dataHoraCriacao: new Date().toISOString()
     };
 
-    onSavePassagem(novaPassagem);
+    const result = await onSavePassagem(novaPassagem);
+
+    if (result && result.storage === 'supabase') {
+      setSaveStatus({
+        type: 'supabase',
+        message: 'Fechamento de turno salvo no Supabase (Nuvem)!'
+      });
+    } else {
+      setSaveStatus({
+        type: 'local',
+        message: 'Fechamento de turno salvo no navegador! (Aguardando sincronização com Supabase)'
+      });
+    }
+
+    setTimeout(() => {
+      setSaveStatus({ type: null, message: '' });
+    }, 4500);
   };
 
   const handleCopyToClipboard = (textToCopy: string) => {
@@ -130,18 +148,34 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
       
       {/* SEÇÃO 4 Form & Generator */}
       <div className="corporate-card p-5 sm:p-6 border-l-4 border-l-[#005b2e]">
-        <div className="flex items-center space-x-2 pb-4 mb-5 border-b border-gray-200">
-          <div className="p-2 bg-emerald-50 rounded-lg text-primary-green">
-            <Sparkles className="w-5 h-5" />
+        <div className="flex items-center justify-between pb-4 mb-5 border-b border-gray-200">
+          <div className="flex items-center space-x-2">
+            <div className="p-2 bg-emerald-50 rounded-lg text-primary-green">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-800">
+                Fechamento de Turno & Relatório Diário
+              </h2>
+              <p className="text-xs text-gray-500 font-medium">
+                Consolidação do dia para envio imediato nos canais da equipe (WhatsApp / Slack)
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-lg font-bold text-gray-800">
-              Fechamento de Turno & Relatório Diário
-            </h2>
-            <p className="text-xs text-gray-500 font-medium">
-              Consolidação do dia para envio imediato nos canais da equipe (WhatsApp / Slack)
-            </p>
-          </div>
+
+          {saveStatus.type === 'supabase' && (
+            <div className="flex items-center gap-2 bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-lg shadow-sm animate-bounce">
+              <CheckCircle2 className="w-4 h-4 text-emerald-200" />
+              <span>{saveStatus.message}</span>
+            </div>
+          )}
+
+          {saveStatus.type === 'local' && (
+            <div className="flex items-center gap-2 bg-amber-600 text-white text-xs font-bold px-3.5 py-2 rounded-lg shadow-sm animate-pulse">
+              <AlertTriangle className="w-4 h-4 text-amber-200" />
+              <span>{saveStatus.message}</span>
+            </div>
+          )}
         </div>
 
         <form onSubmit={handleGerarRelatorio} className="space-y-5">
