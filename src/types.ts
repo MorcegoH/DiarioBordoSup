@@ -16,6 +16,18 @@ export type Impacto = 'Baixo' | 'Médio' | 'Crítico';
 export type Status = 'Pendente' | 'Em Análise' | 'Resolvido';
 
 /**
+ * Representa um registro individual de atualização de andamento da ocorrência (Card de Trabalho).
+ */
+export interface RegistroAtualizacao {
+  id: string;
+  dataHora: string; // ISO string de data e hora do registro de andamento
+  supervisor: string;
+  observacao: string;
+  statusNoMomento?: Status;
+  impactoNoMomento?: Impacto;
+}
+
+/**
  * Representa um registro individual de ocorrência operacional de vendas.
  */
 export interface Ocorrencia {
@@ -29,6 +41,7 @@ export interface Ocorrencia {
   acaoTomada: string;
   status: Status;
   duracaoMinutos?: number; // Duração estimada para resolução (se resolvido)
+  historicoAtualizacoes?: RegistroAtualizacao[]; // Registro de atualizações de andamento no Card de Trabalho
 }
 
 /**

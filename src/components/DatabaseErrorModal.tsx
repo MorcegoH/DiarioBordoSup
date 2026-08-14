@@ -35,8 +35,12 @@ CREATE TABLE public.ocorrencias (
   impacto TEXT NOT NULL,
   acao_tomada TEXT NOT NULL,
   status TEXT NOT NULL,
-  duracao_minutos INTEGER DEFAULT 0
+  duracao_minutos INTEGER DEFAULT 0,
+  historico_atualizacoes JSONB DEFAULT '[]'::jsonb
 );
+
+-- Adicionar coluna em tabelas existentes se já criadas previamente
+ALTER TABLE public.ocorrencias ADD COLUMN IF NOT EXISTS historico_atualizacoes JSONB DEFAULT '[]'::jsonb;
 
 -- 3. CRIAR TABELA DE PASSAGEM DE BASTÃO / FECHAMENTO
 CREATE TABLE public.resumos_passagem (

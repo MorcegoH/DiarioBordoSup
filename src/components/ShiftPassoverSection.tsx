@@ -86,6 +86,11 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
         const iconImpacto = oc.impacto === 'Crítico' ? '🔴' : oc.impacto === 'Médio' ? '🟡' : '🟢';
         text += `${idx + 1}. ${iconImpacto} *[${oc.categoria}]* ${oc.descricao}\n`;
         text += `   ↳ *Status:* ${oc.status} | *Ação:* ${oc.acaoTomada}\n`;
+        if (oc.historicoAtualizacoes && oc.historicoAtualizacoes.length > 0) {
+          const ult = oc.historicoAtualizacoes[oc.historicoAtualizacoes.length - 1];
+          const dataAtt = formatBrazilianDate(ult.dataHora);
+          text += `   ↳ *Último Andamento (${dataAtt} - ${ult.supervisor}):* ${ult.observacao}\n`;
+        }
       });
     }
 
@@ -219,6 +224,7 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
                 onChange={(e) => setSupervisor(e.target.value)}
                 className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#005b2e] font-medium"
               >
+                <option value="Heder Santos">Heder Santos (Gerente de Vendas)</option>
                 <option value="Debora Rodrigues">Debora Rodrigues (Supervisora)</option>
                 <option value="Marilia Farias">Marilia Farias (Supervisora)</option>
               </select>

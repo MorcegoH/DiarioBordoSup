@@ -22,6 +22,20 @@ export interface DbOperationResult {
 }
 
 // Mapeadores para conversão entre o banco (snake_case) e TypeScript (camelCase)
+function parseHistorico(val: any) {
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'string') {
+    try {
+      const parsed = JSON.parse(val);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 function mapOcorrenciaFromDB(row: any): Ocorrencia {
   return {
     id: String(row.id || ''),
@@ -33,7 +47,8 @@ function mapOcorrenciaFromDB(row: any): Ocorrencia {
     impacto: row.impacto,
     acaoTomada: sanitizeTextInput(row.acao_tomada || '', 2000),
     status: row.status,
-    duracaoMinutos: Number(row.duracao_minutos ?? 0)
+    duracaoMinutos: Number(row.duracao_minutos ?? 0),
+    historicoAtualizacoes: parseHistorico(row.historico_atualizacoes)
   };
 }
 
@@ -48,7 +63,8 @@ function mapOcorrenciaToDB(item: Ocorrencia) {
     impacto: item.impacto,
     acao_tomada: item.acaoTomada,
     status: item.status,
-    duracao_minutos: item.duracaoMinutos ?? 0
+    duracao_minutos: item.duracaoMinutos ?? 0,
+    historico_atualizacoes: item.historicoAtualizacoes || []
   };
 }
 
@@ -433,8 +449,16 @@ export const dbService = {
     }
 
     try {
-      const payload = mapOcorrenciaToDB(item);
-      const { error } = await supabase.from('ocorrencias').update(payload).eq('id', item.id);
+      let payload: any = mapOcorrenciaToDB(item);
+      let { error } = await supabase.from('ocorrencias').update(payload).eq('id', item.id);
+      
+      // Se der erro de coluna inexistente (ex: historico_atualizacoes ainda não foi criada via SQL)
+      if (error && error.code === '42703') {
+        const { historico_atualizacoes, ...payloadSemHistorico } = payload;
+        const retryRes = await supabase.from('ocorrencias').update(payloadSemHistorico).eq('id', item.id);
+        error = retryRes.error;
+      }
+
       if (error) {
         console.error('Erro ao atualizar ocorrência no Supabase:', error);
         return { success: false, storage: 'local', errorCode: error.code, error: error.message };

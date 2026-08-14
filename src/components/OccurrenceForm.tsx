@@ -163,6 +163,7 @@ export const OccurrenceForm: React.FC<OccurrenceFormProps> = React.memo(({
               onChange={(e) => setSupervisor(e.target.value)}
               className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#005b2e] focus:border-[#005b2e] focus:bg-white transition-all text-gray-800 font-medium"
             >
+              <option value="Heder Santos">Heder Santos (Gerente de Vendas)</option>
               <option value="Debora Rodrigues">Debora Rodrigues (Supervisora)</option>
               <option value="Marilia Farias">Marilia Farias (Supervisora)</option>
             </select>
