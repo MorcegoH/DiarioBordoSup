@@ -571,14 +571,51 @@ export const dbService = {
     }
 
     try {
-      const payload: any = mapPassagemToDB(nova);
-      let { error } = await supabase.from('resumos_passagem').insert([payload]);
+      // 1. Tentar payload padrão (snake_case completo)
+      const payloadPadrao: any = mapPassagemToDB(nova);
+      let { error } = await supabase.from('resumos_passagem').insert([payloadPadrao]);
 
-      // Fallback gracioso caso a tabela no Supabase não tenha as novas colunas data_hora_conclusao ou status
-      if (error && (error.code === '42703' || error.message?.includes('column'))) {
-        const { data_hora_conclusao, status, ...payloadLegado } = payload;
-        const retry = await supabase.from('resumos_passagem').insert([payloadLegado]);
-        error = retry.error;
+      // 2. Se der erro de coluna ausente no schema cache (PGRST204 ou código 42703)
+      if (error && (error.code === '42703' || error.code === 'PGRST204' || error.message?.includes('column') || error.message?.includes('schema cache'))) {
+        
+        // Tentativa A: camelCase (comum quando a tabela foi criada via interface visual)
+        const payloadCamelCase = {
+          id: nova.id,
+          data: nova.data,
+          supervisor: nova.supervisor,
+          oQueFuncionou: nova.oQueFuncionou,
+          oQueFicaPendente: nova.oQueFicaPendente,
+          dataHoraCriacao: nova.dataHoraCriacao,
+          dataHoraConclusao: nova.dataHoraConclusao || null,
+          status: nova.status || 'Pendente'
+        };
+        const retryA = await supabase.from('resumos_passagem').insert([payloadCamelCase]);
+        if (!retryA.error) {
+          return { success: true, storage: 'supabase' };
+        }
+
+        // Tentativa B: Nomes descritivos legados
+        const payloadLegadoDescritivo = {
+          id: nova.id,
+          data: nova.data,
+          supervisor: nova.supervisor,
+          o_que_funcionou_hoje: nova.oQueFuncionou,
+          o_que_fica_pendente_amanha: nova.oQueFicaPendente,
+          data_hora_criacao: nova.dataHoraCriacao
+        };
+        const retryB = await supabase.from('resumos_passagem').insert([payloadLegadoDescritivo]);
+        if (!retryB.error) {
+          return { success: true, storage: 'supabase' };
+        }
+
+        // Tentativa C: Apenas colunas base mínimas
+        const { data_hora_conclusao, status, ...payloadBase } = payloadPadrao;
+        const retryC = await supabase.from('resumos_passagem').insert([payloadBase]);
+        if (!retryC.error) {
+          return { success: true, storage: 'supabase' };
+        }
+
+        error = retryA.error || retryB.error || retryC.error || error;
       }
 
       if (error) {
