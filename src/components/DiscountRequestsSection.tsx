@@ -23,8 +23,15 @@ export const DiscountRequestsSection: React.FC = React.memo(() => {
 
   // Carregar dados na montagem
   useEffect(() => {
-    const dados = discountService.getSolicitacoes();
-    setSolicitacoes(dados);
+    let isMounted = true;
+    discountService.getSolicitacoesAsync().then((dados) => {
+      if (isMounted) {
+        setSolicitacoes(dados);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Lista de meses disponíveis com solicitações
@@ -38,33 +45,33 @@ export const DiscountRequestsSection: React.FC = React.memo(() => {
   }, [solicitacoes, mesSelecionado]);
 
   // Handler para adicionar nova solicitação
-  const handleAddSolicitacao = useCallback((nova: SolicitacaoDesconto) => {
-    const atualizadas = discountService.addSolicitacao(nova);
+  const handleAddSolicitacao = useCallback(async (nova: SolicitacaoDesconto) => {
+    const atualizadas = await discountService.addSolicitacao(nova);
     setSolicitacoes(atualizadas);
   }, []);
 
   // Handler para registrar liberação direta do Gerente
-  const handleManagerDirectRelease = useCallback((novaLiberacao: SolicitacaoDesconto) => {
-    const atualizadas = discountService.addSolicitacao(novaLiberacao);
+  const handleManagerDirectRelease = useCallback(async (novaLiberacao: SolicitacaoDesconto) => {
+    const atualizadas = await discountService.addSolicitacao(novaLiberacao);
     setSolicitacoes(atualizadas);
   }, []);
 
   // Handler para confirmar aprovação
-  const handleConfirmAprovacao = useCallback((id: string, parecer: string, aprovador: string) => {
-    const atualizadas = discountService.aprovarSolicitacao(id, parecer, aprovador);
+  const handleConfirmAprovacao = useCallback(async (id: string, parecer: string, aprovador: string) => {
+    const atualizadas = await discountService.aprovarSolicitacao(id, parecer, aprovador);
     setSolicitacoes(atualizadas);
   }, []);
 
   // Handler para confirmar reprovação
-  const handleConfirmReprovacao = useCallback((id: string, parecer: string, aprovador: string) => {
-    const atualizadas = discountService.reprovarSolicitacao(id, parecer, aprovador);
+  const handleConfirmReprovacao = useCallback(async (id: string, parecer: string, aprovador: string) => {
+    const atualizadas = await discountService.reprovarSolicitacao(id, parecer, aprovador);
     setSolicitacoes(atualizadas);
   }, []);
 
-  // Resetar dados para mock padrão
-  const handleResetMockData = useCallback(() => {
-    if (window.confirm('Deseja restaurar as solicitações de desconto para os dados padrão de teste?')) {
-      const resetadas = discountService.resetData();
+  // Resetar dados para estado limpo
+  const handleResetMockData = useCallback(async () => {
+    if (window.confirm('Deseja limpar todos os registros de solicitações de desconto?')) {
+      const resetadas = await discountService.clearAllData();
       setSolicitacoes(resetadas);
     }
   }, []);

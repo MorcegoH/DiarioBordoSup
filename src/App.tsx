@@ -8,6 +8,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Ocorrencia, ResumoPassagem, Status } from './types';
 import { INITIAL_MOCK_OCORRENCIAS, INITIAL_MOCK_PASSAGENS } from './data/mockData';
 import { dbService } from './services/dbService';
+import { discountService } from './services/discountService';
 import { Header } from './components/Header';
 import { OccurrenceForm } from './components/OccurrenceForm';
 import { OccurrenceHistory } from './components/OccurrenceHistory';
@@ -135,7 +136,10 @@ export default function App() {
       if (window.confirm('Tem certeza absoluta que deseja zerar todos os registros do sistema (Banco Supabase e LocalStorage)?')) {
         setOcorrencias([]);
         setPassagens([]);
-        await dbService.clearAllData();
+        await Promise.all([
+          dbService.clearAllData(),
+          discountService.clearAllData()
+        ]);
         alert('Todos os dados foram zerados com sucesso.');
       }
     } else if (senhaInput !== null) {

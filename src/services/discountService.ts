@@ -1,10 +1,13 @@
 /**
  * @file src/services/discountService.ts
  * @description Serviço de persistência e gerenciamento de regras financeiras para Solicitações de Desconto.
+ * Integra nativamente com a tabela public.solicitacoes_desconto no Supabase e provê fallback em LocalStorage.
  */
 
 import { SolicitacaoDesconto, BudgetState, BudgetCycleInfo } from '../types';
-import { INITIAL_MOCK_DESCONTOS, BUDGET_LIMITS } from '../data/discountData';
+import { BUDGET_LIMITS } from '../data/discountData';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { sanitizeTextInput } from '../utils/security';
 
 const LOCAL_STORAGE_KEY = 'diario_bordo_solicitacoes_desconto_v1';
 
@@ -17,6 +20,60 @@ const MESES_CURTOS = [
   'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
   'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'
 ];
+
+/**
+ * Mapeador de linha do Banco de Dados para TypeScript
+ */
+function mapSolicitacaoFromDB(row: any): SolicitacaoDesconto {
+  return {
+    id: String(row.id || ''),
+    dataHoraSolicitacao: row.data_hora_solicitacao,
+    cliente: sanitizeTextInput(row.cliente || '', 120),
+    placa: sanitizeTextInput(row.placa || '', 10),
+    consultor: sanitizeTextInput(row.consultor || '', 100),
+    supervisora: sanitizeTextInput(row.supervisora || '', 100),
+    tipoDesconto: row.tipo_desconto === 'Plano' ? 'Plano' : 'Adesão',
+    valorCheio: Number(row.valor_cheio ?? 0),
+    descontoInput: Number(row.desconto_input ?? 0),
+    valorDescontoCalculado: Number(row.valor_desconto_calculado ?? 0),
+    percentualDesconto: Number(row.percentual_desconto ?? 0),
+    valorFinal: Number(row.valor_final ?? 0),
+    justificativa: sanitizeTextInput(row.justificativa || '', 2000),
+    status: row.status === 'Aprovado' ? 'Aprovado' : (row.status === 'Negado' ? 'Negado' : 'Aguardando Aprovação'),
+    dataHoraAprovacao: row.data_hora_aprovacao ?? undefined,
+    parecer: row.parecer ? sanitizeTextInput(row.parecer, 1500) : undefined,
+    aprovador: row.aprovador ? sanitizeTextInput(row.aprovador, 100) : undefined,
+    tipoRegistro: row.tipo_registro ?? 'SolicitacaoSupervisao'
+  };
+}
+
+/**
+ * Mapeador de TypeScript para linha do Banco de Dados
+ */
+function mapSolicitacaoToDB(item: SolicitacaoDesconto) {
+  const dataRef = item.dataHoraSolicitacao || new Date().toISOString();
+  return {
+    id: item.id,
+    data_hora_solicitacao: dataRef,
+    mes_competencia: extrairMesAno(dataRef),
+    cliente: item.cliente,
+    placa: item.placa,
+    consultor: item.consultor,
+    supervisora: item.supervisora,
+    tipo_desconto: item.tipoDesconto,
+    valor_cheio: item.valorCheio,
+    desconto_input: item.descontoInput,
+    valor_desconto_calculado: item.valorDescontoCalculado,
+    percentual_desconto: item.percentualDesconto,
+    valor_final: item.valorFinal,
+    justificativa: item.justificativa,
+    status: item.status,
+    data_hora_aprovacao: item.dataHoraAprovacao || null,
+    parecer: item.parecer || null,
+    aprovador: item.aprovador || null,
+    tipo_registro: item.tipoRegistro || 'SolicitacaoSupervisao'
+  };
+}
 
 /**
  * Extrai a chave "YYYY-MM" de uma string ISO ou objeto Date
@@ -76,23 +133,26 @@ export function gerarInfoCiclo(mesAnoRef?: string): BudgetCycleInfo {
 
 class DiscountService {
   /**
-   * Recupera a lista de solicitações de desconto salvas
+   * Recupera a lista de solicitações de desconto salvas localmente
    */
-  getSolicitacoes(): SolicitacaoDesconto[] {
+  getLocalSolicitacoes(): SolicitacaoDesconto[] {
     try {
       const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+        if (Array.isArray(parsed)) {
+          // Filtra itens de teste antigos se existirem
+          const limpos = parsed.filter(item => !item.id?.startsWith('desc-20260815-') && !item.id?.startsWith('desc-20260814-') && !item.id?.startsWith('desc-20260813-'));
+          if (limpos.length !== parsed.length) {
+            this.saveToStorage(limpos);
+          }
+          return limpos;
         }
       }
     } catch (e) {
       console.error('Erro ao ler solicitações de desconto do localStorage:', e);
     }
-    // Salvar mock inicial na primeira vez
-    this.saveToStorage(INITIAL_MOCK_DESCONTOS);
-    return INITIAL_MOCK_DESCONTOS;
+    return [];
   }
 
   /**
@@ -107,20 +167,59 @@ class DiscountService {
   }
 
   /**
+   * Carrega as solicitações do Supabase ou LocalStorage
+   */
+  async getSolicitacoesAsync(): Promise<SolicitacaoDesconto[]> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('solicitacoes_desconto')
+          .select('*')
+          .order('data_hora_solicitacao', { ascending: false });
+
+        if (!error && Array.isArray(data)) {
+          const mapped = data.map(mapSolicitacaoFromDB);
+          this.saveToStorage(mapped);
+          return mapped;
+        }
+      } catch (err) {
+        console.warn('Falha na consulta ao Supabase (solicitacoes_desconto), usando fallback local:', err);
+      }
+    }
+    return this.getLocalSolicitacoes();
+  }
+
+  /**
+   * Recupera a lista síncrona
+   */
+  getSolicitacoes(): SolicitacaoDesconto[] {
+    return this.getLocalSolicitacoes();
+  }
+
+  /**
    * Adiciona uma nova solicitação de desconto
    */
-  addSolicitacao(nova: SolicitacaoDesconto): SolicitacaoDesconto[] {
-    const atuais = this.getSolicitacoes();
-    const atualizadas = [nova, ...atuais];
+  async addSolicitacao(nova: SolicitacaoDesconto): Promise<SolicitacaoDesconto[]> {
+    const atuais = this.getLocalSolicitacoes();
+    const atualizadas = [nova, ...atuais.filter(i => i.id !== nova.id)];
     this.saveToStorage(atualizadas);
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('solicitacoes_desconto').insert(mapSolicitacaoToDB(nova));
+      } catch (err) {
+        console.error('Erro ao inserir no Supabase:', err);
+      }
+    }
+
     return atualizadas;
   }
 
   /**
    * Aprova uma solicitação de desconto
    */
-  aprovarSolicitacao(id: string, parecer: string, aprovador: string = 'Heder Santos (Gerente)'): SolicitacaoDesconto[] {
-    const atuais = this.getSolicitacoes();
+  async aprovarSolicitacao(id: string, parecer: string, aprovador: string = 'Heder Santos (Gerente)'): Promise<SolicitacaoDesconto[]> {
+    const atuais = this.getLocalSolicitacoes();
     const agora = new Date().toISOString();
     const atualizadas = atuais.map((item) => {
       if (item.id === id) {
@@ -135,14 +234,31 @@ class DiscountService {
       return item;
     });
     this.saveToStorage(atualizadas);
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase
+          .from('solicitacoes_desconto')
+          .update({
+            status: 'Aprovado',
+            data_hora_aprovacao: agora,
+            parecer: parecer.trim(),
+            aprovador
+          })
+          .eq('id', id);
+      } catch (err) {
+        console.error('Erro ao atualizar aprovação no Supabase:', err);
+      }
+    }
+
     return atualizadas;
   }
 
   /**
    * Reprova uma solicitação de desconto
    */
-  reprovarSolicitacao(id: string, parecer: string, aprovador: string = 'Heder Santos (Gerente)'): SolicitacaoDesconto[] {
-    const atuais = this.getSolicitacoes();
+  async reprovarSolicitacao(id: string, parecer: string, aprovador: string = 'Heder Santos (Gerente)'): Promise<SolicitacaoDesconto[]> {
+    const atuais = this.getLocalSolicitacoes();
     const agora = new Date().toISOString();
     const atualizadas = atuais.map((item) => {
       if (item.id === id) {
@@ -157,25 +273,68 @@ class DiscountService {
       return item;
     });
     this.saveToStorage(atualizadas);
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase
+          .from('solicitacoes_desconto')
+          .update({
+            status: 'Negado',
+            data_hora_aprovacao: agora,
+            parecer: parecer.trim(),
+            aprovador
+          })
+          .eq('id', id);
+      } catch (err) {
+        console.error('Erro ao atualizar reprovação no Supabase:', err);
+      }
+    }
+
     return atualizadas;
   }
 
   /**
    * Remove uma solicitação
    */
-  deleteSolicitacao(id: string): SolicitacaoDesconto[] {
-    const atuais = this.getSolicitacoes();
+  async deleteSolicitacao(id: string): Promise<SolicitacaoDesconto[]> {
+    const atuais = this.getLocalSolicitacoes();
     const atualizadas = atuais.filter((item) => item.id !== id);
     this.saveToStorage(atualizadas);
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('solicitacoes_desconto').delete().eq('id', id);
+      } catch (err) {
+        console.error('Erro ao deletar no Supabase:', err);
+      }
+    }
+
     return atualizadas;
   }
 
   /**
-   * Restaura os dados para o padrão de mock
+   * Limpa todos os dados
+   */
+  async clearAllData(): Promise<SolicitacaoDesconto[]> {
+    this.saveToStorage([]);
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('solicitacoes_desconto').delete().neq('id', 'placeholder-none');
+      } catch (err) {
+        console.error('Erro ao limpar solicitacoes_desconto no Supabase:', err);
+      }
+    }
+
+    return [];
+  }
+
+  /**
+   * Restaura os dados para o padrão limpo
    */
   resetData(): SolicitacaoDesconto[] {
-    this.saveToStorage(INITIAL_MOCK_DESCONTOS);
-    return INITIAL_MOCK_DESCONTOS;
+    this.saveToStorage([]);
+    return [];
   }
 
   /**
@@ -208,8 +367,6 @@ class DiscountService {
 
   /**
    * Calcula a posição do orçamento (Budget) referente a um mês específico.
-   * Por padrão, calcula o mês atual. O teto é mensal (R$ 900 total: R$ 400 Débora, R$ 400 Marília, R$ 100 Gerente)
-   * e se renova integralmente a cada mês.
    */
   calcularBudget(solicitacoes: SolicitacaoDesconto[], mesAnoReferencia?: string): BudgetState {
     const ciclo = gerarInfoCiclo(mesAnoReferencia);
@@ -222,11 +379,9 @@ class DiscountService {
     let gerenteGasto = 0;
 
     solicitacoes.forEach((item) => {
-      // Data relevante para cômputo no ciclo mensal
       const dataRef = item.dataHoraSolicitacao || item.dataHoraAprovacao;
       const mesItem = extrairMesAno(dataRef);
 
-      // Apenas considera lançamentos pertencentes ao ciclo mensal consultado
       if (mesItem !== chaveAlvo) {
         return;
       }
@@ -240,7 +395,6 @@ class DiscountService {
         if (isGerencia && !isDebora && !isMarilia) {
           gerenteGasto += valor;
         } else if (item.tipoRegistro === 'LiberacaoGerencial') {
-          // Se o gerente liberou diretamente utilizando sua reserva de contingência
           gerenteGasto += valor;
         } else if (isDebora) {
           deboraGasto += valor;
@@ -287,3 +441,4 @@ class DiscountService {
 }
 
 export const discountService = new DiscountService();
+
