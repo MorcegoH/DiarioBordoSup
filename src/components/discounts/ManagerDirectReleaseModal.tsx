@@ -38,8 +38,8 @@ export const ManagerDirectReleaseModal: React.FC<ManagerDirectReleaseModalProps>
   saldoReservaGerente = 100.0,
   ciclo
 }) => {
-  const [supervisora, setSupervisora] = useState<string>('Débora Rodrigues');
-  const [consultor, setConsultor] = useState<string>('Erick');
+  const [supervisora, setSupervisora] = useState<'Débora Rodrigues' | 'Marília Farias'>('Débora Rodrigues');
+  const [consultor, setConsultor] = useState<string>(HIERARQUIA_EQUIPES.supervisoras['Débora Rodrigues'][0] || 'Erick');
   const [cliente, setCliente] = useState<string>('');
   const [placaInput, setPlacaInput] = useState<string>('');
   const [tipoDesconto, setTipoDesconto] = useState<TipoDesconto>('Adesão');
@@ -66,24 +66,15 @@ export const ManagerDirectReleaseModal: React.FC<ManagerDirectReleaseModalProps>
 
   // Lista de consultores baseada na supervisora selecionada
   const consultoresDisponiveis = useMemo(() => {
-    if (supervisora === 'Débora Rodrigues') {
-      return HIERARQUIA_EQUIPES.supervisoras['Débora Rodrigues'];
-    }
-    if (supervisora === 'Marília Farias') {
-      return HIERARQUIA_EQUIPES.supervisoras['Marília Farias'];
-    }
-    return ['Consultor Geral / Outro'];
+    return HIERARQUIA_EQUIPES.supervisoras[supervisora] || [];
   }, [supervisora]);
 
   // Atualiza consultor padrão ao trocar supervisora
-  const handleSupervisoraChange = (novaSupervisora: string) => {
+  const handleSupervisoraChange = (novaSupervisora: 'Débora Rodrigues' | 'Marília Farias') => {
     setSupervisora(novaSupervisora);
-    if (novaSupervisora === 'Débora Rodrigues') {
-      setConsultor(HIERARQUIA_EQUIPES.supervisoras['Débora Rodrigues'][0]);
-    } else if (novaSupervisora === 'Marília Farias') {
-      setConsultor(HIERARQUIA_EQUIPES.supervisoras['Marília Farias'][0]);
-    } else {
-      setConsultor('Vendas Diretas');
+    const consultores = HIERARQUIA_EQUIPES.supervisoras[novaSupervisora] || [];
+    if (consultores.length > 0) {
+      setConsultor(consultores[0]);
     }
   };
 
@@ -278,7 +269,7 @@ export const ManagerDirectReleaseModal: React.FC<ManagerDirectReleaseModalProps>
               <div className="flex items-center gap-2">
                 <CalendarDays className="w-4 h-4 text-[#005b2e] shrink-0" />
                 <span>
-                  <strong>Competência:</strong> {ciclo.mesExtenso} ({ciclo.periodoInicio} a {ciclo.periodoFim})
+                  <strong>Competência:</strong> {ciclo.mesExtenso}
                 </span>
               </div>
               <span className="font-semibold text-emerald-800 text-[11px]">
@@ -323,12 +314,11 @@ export const ManagerDirectReleaseModal: React.FC<ManagerDirectReleaseModalProps>
               </label>
               <select
                 value={supervisora}
-                onChange={(e) => handleSupervisoraChange(e.target.value)}
+                onChange={(e) => handleSupervisoraChange(e.target.value as 'Débora Rodrigues' | 'Marília Farias')}
                 className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 bg-white font-semibold focus:ring-2 focus:ring-[#005b2e] focus:border-[#005b2e]"
               >
                 <option value="Débora Rodrigues">Equipe Débora Rodrigues</option>
                 <option value="Marília Farias">Equipe Marília Farias</option>
-                <option value="Gerência (Heder Santos)">Gerência Direta / Outros</option>
               </select>
             </div>
 
