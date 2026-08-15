@@ -14,7 +14,6 @@ import {
   Check,
   ServerOff,
   HelpCircle,
-  Code,
   CloudUpload,
   CheckCircle2,
   Globe,
@@ -24,7 +23,8 @@ import {
   Zap,
   Activity,
   Layers,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Code
 } from 'lucide-react';
 import { dbService, DbHealthStatus } from '../services/dbService';
 
@@ -35,89 +35,6 @@ interface DatabaseErrorModalProps {
   onRetryConnection: () => Promise<void>;
   onSyncComplete?: () => void;
 }
-
-const SUPABASE_DDL_SQL = `-- SCRIPT DE CRIAÇÃO LIMPA E SEGURA DAS TABELAS NO SUPABASE
--- Copie e cole no SQL Editor do Supabase (https://supabase.com/dashboard)
--- Este script recria as tabelas, ativa o RLS (Row Level Security) e define as políticas de segurança.
-
--- 1. APAGAR TABELAS ANTIGAS (OPCIONAL/SEGURO PARA RECRIAÇÃO)
-DROP TABLE IF EXISTS public.ocorrencias CASCADE;
-DROP TABLE IF EXISTS public.resumos_passagem CASCADE;
-
--- 2. CRIAR TABELA DE OCORRÊNCIAS
-CREATE TABLE public.ocorrencias (
-  id TEXT PRIMARY KEY,
-  data_hora TIMESTAMPTZ NOT NULL,
-  data_hora_conclusao TIMESTAMPTZ,
-  supervisor TEXT NOT NULL,
-  categoria TEXT NOT NULL,
-  descricao TEXT NOT NULL,
-  impacto TEXT NOT NULL,
-  acao_tomada TEXT NOT NULL,
-  status TEXT NOT NULL,
-  duracao_minutos INTEGER DEFAULT 0,
-  historico_atualizacoes JSONB DEFAULT '[]'::jsonb
-);
-
--- Adicionar coluna em tabelas existentes se já criadas previamente
-ALTER TABLE public.ocorrencias ADD COLUMN IF NOT EXISTS historico_atualizacoes JSONB DEFAULT '[]'::jsonb;
-
--- 3. CRIAR TABELA DE PASSAGEM DE BASTÃO / FECHAMENTO
-CREATE TABLE IF NOT EXISTS public.resumos_passagem (
-  id TEXT PRIMARY KEY,
-  data TEXT NOT NULL,
-  supervisor TEXT NOT NULL,
-  conteudo JSONB DEFAULT '{}'::jsonb,
-  o_que_funcionou TEXT,
-  o_que_fica_pendente TEXT,
-  data_hora_criacao TIMESTAMPTZ NOT NULL,
-  data_hora_conclusao TIMESTAMPTZ,
-  status TEXT DEFAULT 'Pendente',
-  observacao_conclusao TEXT,
-  responsavel_conclusao TEXT,
-  comentarios JSONB DEFAULT '[]'::jsonb
-);
-
--- Adicionar colunas se tabela já foi criada anteriormente
-ALTER TABLE public.resumos_passagem ADD COLUMN IF NOT EXISTS conteudo JSONB DEFAULT '{}'::jsonb;
-ALTER TABLE public.resumos_passagem ADD COLUMN IF NOT EXISTS o_que_funcionou TEXT;
-ALTER TABLE public.resumos_passagem ADD COLUMN IF NOT EXISTS o_que_fica_pendente TEXT;
-ALTER TABLE public.resumos_passagem ADD COLUMN IF NOT EXISTS data_hora_conclusao TIMESTAMPTZ;
-ALTER TABLE public.resumos_passagem ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'Pendente';
-ALTER TABLE public.resumos_passagem ADD COLUMN IF NOT EXISTS observacao_conclusao TEXT;
-ALTER TABLE public.resumos_passagem ADD COLUMN IF NOT EXISTS responsavel_conclusao TEXT;
-ALTER TABLE public.resumos_passagem ADD COLUMN IF NOT EXISTS comentarios JSONB DEFAULT '[]'::jsonb;
-
--- 4. ATIVAR ROW LEVEL SECURITY (RLS) PARA SEGURANÇA
-ALTER TABLE public.ocorrencias ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.resumos_passagem ENABLE ROW LEVEL SECURITY;
-
--- 5. POLÍTICAS DE SEGURANÇA RLS PARA A TABELA 'ocorrencias' (Chave Anônima / Anon)
-DROP POLICY IF EXISTS "Permitir leitura anonima ocorrencias" ON public.ocorrencias;
-CREATE POLICY "Permitir leitura anonima ocorrencias" ON public.ocorrencias FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Permitir insercao anonima ocorrencias" ON public.ocorrencias;
-CREATE POLICY "Permitir insercao anonima ocorrencias" ON public.ocorrencias FOR INSERT WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Permitir atualizacao anonima ocorrencias" ON public.ocorrencias;
-CREATE POLICY "Permitir atualizacao anonima ocorrencias" ON public.ocorrencias FOR UPDATE USING (true);
-
-DROP POLICY IF EXISTS "Permitir exclusao anonima ocorrencias" ON public.ocorrencias;
-CREATE POLICY "Permitir exclusao anonima ocorrencias" ON public.ocorrencias FOR DELETE USING (true);
-
--- 6. POLÍTICAS DE SEGURANÇA RLS PARA A TABELA 'resumos_passagem' (Chave Anônima / Anon)
-DROP POLICY IF EXISTS "Permitir leitura anonima resumos" ON public.resumos_passagem;
-CREATE POLICY "Permitir leitura anonima resumos" ON public.resumos_passagem FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Permitir insercao anonima resumos" ON public.resumos_passagem;
-CREATE POLICY "Permitir insercao anonima resumos" ON public.resumos_passagem FOR INSERT WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Permitir atualizacao anonima resumos" ON public.resumos_passagem;
-CREATE POLICY "Permitir atualizacao anonima resumos" ON public.resumos_passagem FOR UPDATE USING (true);
-
-DROP POLICY IF EXISTS "Permitir exclusao anonima resumos" ON public.resumos_passagem;
-CREATE POLICY "Permitir exclusao anonima resumos" ON public.resumos_passagem FOR DELETE USING (true);
-`;
 
 export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
   isOpen,
@@ -132,9 +49,8 @@ export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
-  const [copiedSql, setCopiedSql] = useState(false);
   const [copiedEmail, setCopiedEmail] = useState(false);
-  const [activeTab, setActiveTab] = useState<'visao_geral' | 'sql' | 'diagnostico'>(
+  const [activeTab, setActiveTab] = useState<'visao_geral' | 'diagnostico'>(
     isHealthy ? 'visao_geral' : 'diagnostico'
   );
 
@@ -180,12 +96,6 @@ export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
     }
   };
 
-  const handleCopySql = () => {
-    navigator.clipboard.writeText(SUPABASE_DDL_SQL);
-    setCopiedSql(true);
-    setTimeout(() => setCopiedSql(false), 2000);
-  };
-
   const handleCopyAdminEmail = () => {
     navigator.clipboard.writeText('heder.santos@adarco.com.br');
     setCopiedEmail(true);
@@ -223,20 +133,20 @@ export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
             title="Fechar"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Abas Internas */}
+        {/* Abas Internas (Apenas Infraestrutura e Diagnóstico/Teste) */}
         <div className="flex border-b border-gray-200 bg-gray-50 px-4 pt-2 shrink-0 overflow-x-auto">
           {isHealthy ? (
             <>
               <button
                 onClick={() => setActiveTab('visao_geral')}
-                className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+                className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                   activeTab === 'visao_geral'
                     ? 'border-emerald-600 text-emerald-800 bg-white rounded-t-lg shadow-2xs'
                     : 'border-transparent text-gray-500 hover:text-gray-800'
@@ -247,7 +157,7 @@ export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
               </button>
               <button
                 onClick={() => setActiveTab('diagnostico')}
-                className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+                className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                   activeTab === 'diagnostico'
                     ? 'border-emerald-600 text-emerald-800 bg-white rounded-t-lg shadow-2xs'
                     : 'border-transparent text-gray-500 hover:text-gray-800'
@@ -256,43 +166,15 @@ export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
                 <Activity className="w-3.5 h-3.5" />
                 <span>Teste de Conexão & Escrita</span>
               </button>
-              <button
-                onClick={() => setActiveTab('sql')}
-                className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${
-                  activeTab === 'sql'
-                    ? 'border-emerald-600 text-emerald-800 bg-white rounded-t-lg shadow-2xs'
-                    : 'border-transparent text-gray-500 hover:text-gray-800'
-                }`}
-              >
-                <Code className="w-3.5 h-3.5" />
-                <span>Script SQL (Tabelas e RLS)</span>
-              </button>
             </>
           ) : (
-            <>
-              <button
-                onClick={() => setActiveTab('diagnostico')}
-                className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${
-                  activeTab === 'diagnostico'
-                    ? 'border-red-600 text-red-700 bg-white rounded-t-lg shadow-2xs'
-                    : 'border-transparent text-gray-500 hover:text-gray-800'
-                }`}
-              >
-                <AlertOctagon className="w-3.5 h-3.5" />
-                <span>Diagnóstico do Erro</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('sql')}
-                className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${
-                  activeTab === 'sql'
-                    ? 'border-emerald-600 text-emerald-700 bg-white rounded-t-lg shadow-2xs'
-                    : 'border-transparent text-gray-500 hover:text-gray-800'
-                }`}
-              >
-                <Code className="w-3.5 h-3.5" />
-                <span>Script SQL (Tabelas e RLS)</span>
-              </button>
-            </>
+            <button
+              onClick={() => setActiveTab('diagnostico')}
+              className="px-4 py-2 text-xs font-bold border-b-2 border-red-600 text-red-700 bg-white rounded-t-lg shadow-2xs flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+            >
+              <AlertOctagon className="w-3.5 h-3.5" />
+              <span>Diagnóstico do Erro</span>
+            </button>
           )}
         </div>
 
@@ -407,7 +289,7 @@ export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleCopyAdminEmail}
-                    className="px-2.5 py-1.5 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 rounded-md font-semibold text-xs transition-colors flex items-center gap-1.5"
+                    className="px-2.5 py-1.5 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 rounded-md font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
                     title="Copiar e-mail do administrador"
                   >
                     {copiedEmail ? (
@@ -424,7 +306,7 @@ export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
                   </button>
                   <a
                     href="mailto:heder.santos@adarco.com.br?subject=Diario%20de%20Bordo%20-%20Contato%20Administracao"
-                    className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-md font-semibold text-xs transition-colors inline-flex items-center gap-1"
+                    className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-md font-semibold text-xs transition-colors inline-flex items-center gap-1 cursor-pointer"
                   >
                     <span>Contatar</span>
                   </a>
@@ -454,7 +336,7 @@ export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
                       {healthStatus.errorCode && (
                         <button
                           onClick={handleCopyErrorCode}
-                          className="px-2 py-0.5 bg-white border border-red-300 hover:bg-red-100 text-red-800 rounded text-xs font-medium flex items-center gap-1 transition-colors"
+                          className="px-2 py-0.5 bg-white border border-red-300 hover:bg-red-100 text-red-800 rounded text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer"
                           title="Copiar código do erro"
                         >
                           {copiedCode ? (
@@ -509,7 +391,7 @@ export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
                     </div>
                     <button
                       onClick={handleCopyAdminEmail}
-                      className="px-2.5 py-1 bg-white hover:bg-amber-100 border border-amber-300 text-amber-900 rounded font-semibold text-xs shrink-0 flex items-center justify-center gap-1.5"
+                      className="px-2.5 py-1 bg-white hover:bg-amber-100 border border-amber-300 text-amber-900 rounded font-semibold text-xs shrink-0 flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       {copiedEmail ? (
                         <>
@@ -547,7 +429,7 @@ export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
                   <button
                     onClick={handleRunDiagnostic}
                     disabled={isRunningDiag}
-                    className="px-3 py-1 bg-blue-700 hover:bg-blue-800 text-white rounded text-xs font-bold transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                    className="px-3 py-1 bg-blue-700 hover:bg-blue-800 text-white rounded text-xs font-bold transition-colors disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                   >
                     <RefreshCw className={`w-3 h-3 ${isRunningDiag ? 'animate-spin' : ''}`} />
                     <span>{isRunningDiag ? 'Executando Teste...' : 'Testar Escrita Agora'}</span>
@@ -587,7 +469,7 @@ export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
                 <button
                   onClick={handleSyncPending}
                   disabled={isSyncing}
-                  className="w-full py-2 px-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-lg transition-colors flex items-center justify-center gap-2 shadow-xs disabled:opacity-50"
+                  className="w-full py-2 px-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-lg transition-colors flex items-center justify-center gap-2 shadow-xs disabled:opacity-50 cursor-pointer"
                 >
                   <CloudUpload className={`w-4 h-4 ${isSyncing ? 'animate-bounce' : ''}`} />
                   <span>{isSyncing ? 'Sincronizando no Supabase...' : 'Sincronizar Dados Retidos no Supabase'}</span>
@@ -609,8 +491,7 @@ export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
                   </p>
                   <ol className="list-decimal list-inside space-y-1 text-amber-800 leading-relaxed">
                     <li>Confirme se as variáveis <code className="bg-amber-100 px-1 font-mono text-amber-950">VITE_SUPABASE_URL</code> e <code className="bg-amber-100 px-1 font-mono text-amber-950">VITE_SUPABASE_ANON_KEY</code> no arquivo <code>.env</code> contêm as chaves do projeto.</li>
-                    <li>No painel do Supabase, vá em <strong>SQL Editor</strong> e execute o script SQL disponibilizado na aba ao lado para criar as tabelas e políticas RLS.</li>
-                    <li>Após aplicar o script no Supabase, clique em <strong>"Tentar Reconectar"</strong> e depois em <strong>"Sincronizar Dados Retidos"</strong>.</li>
+                    <li>Após verificar as variáveis no Supabase, clique em <strong>"Tentar Reconectar"</strong> e depois em <strong>"Sincronizar Dados Retidos"</strong>.</li>
                   </ol>
                 </div>
               )}
@@ -622,41 +503,6 @@ export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
             </div>
           )}
 
-          {/* ================= ABA 3: SCRIPT SQL ================= */}
-          {activeTab === 'sql' && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="font-bold text-xs uppercase tracking-wider text-gray-700">
-                  Script DDL de Criação de Tabelas e Permissões RLS:
-                </h4>
-                <button
-                  onClick={handleCopySql}
-                  className="px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded text-xs font-bold flex items-center gap-1.5 transition-colors"
-                >
-                  {copiedSql ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-200" />
-                      <span>SQL Copiado!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Copiar Script SQL</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              <p className="text-xs text-gray-600 leading-relaxed">
-                Copie o script abaixo e execute no <strong>SQL Editor</strong> do projeto no Supabase para garantir que as tabelas <code className="font-mono bg-gray-100 px-1">ocorrencias</code> e <code className="font-mono bg-gray-100 px-1">resumos_passagem</code> existam com as políticas de acesso público ativas:
-              </p>
-
-              <pre className="bg-gray-900 text-emerald-400 font-mono text-xs p-3.5 rounded-lg border border-gray-800 overflow-x-auto whitespace-pre leading-relaxed select-all max-h-64">
-                {SUPABASE_DDL_SQL}
-              </pre>
-            </div>
-          )}
-
         </div>
 
         {/* Rodapé do Modal */}
@@ -664,7 +510,7 @@ export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
           <button
             onClick={handleRetry}
             disabled={isRetrying}
-            className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs disabled:opacity-50"
+            className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRetrying ? 'animate-spin' : ''}`} />
             <span>{isRetrying ? 'Testando Conexão...' : 'Tentar Reconectar'}</span>
@@ -672,7 +518,7 @@ export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
 
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-xs font-semibold transition-colors"
+            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
           >
             Fechar
           </button>
