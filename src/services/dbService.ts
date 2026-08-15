@@ -71,11 +71,13 @@ function mapOcorrenciaToDB(item: Ocorrencia) {
 function mapPassagemFromDB(row: any): ResumoPassagem {
   return {
     id: String(row.id || ''),
-    data: row.data,
-    supervisor: row.supervisor,
-    oQueFuncionou: row.o_que_funcionou,
-    oQueFicaPendente: row.o_que_fica_pendente,
-    dataHoraCriacao: row.data_hora_criacao
+    data: row.data || '',
+    supervisor: sanitizeTextInput(row.supervisor || '', 100),
+    oQueFuncionou: sanitizeTextInput(row.o_que_funcionou || row.o_que_funcionou_hoje || '', 3000),
+    oQueFicaPendente: sanitizeTextInput(row.o_que_fica_pendente || row.o_que_fica_pendente_amanha || row.pendencias || '', 3000),
+    dataHoraCriacao: row.data_hora_criacao || row.created_at || new Date().toISOString(),
+    dataHoraConclusao: row.data_hora_conclusao || undefined,
+    status: row.status || (row.data_hora_conclusao ? 'Concluído' : 'Pendente')
   };
 }
 
@@ -86,7 +88,9 @@ function mapPassagemToDB(item: ResumoPassagem) {
     supervisor: item.supervisor,
     o_que_funcionou: item.oQueFuncionou,
     o_que_fica_pendente: item.oQueFicaPendente,
-    data_hora_criacao: item.dataHoraCriacao
+    data_hora_criacao: item.dataHoraCriacao,
+    data_hora_conclusao: item.dataHoraConclusao || null,
+    status: item.status || (item.dataHoraConclusao ? 'Concluído' : 'Pendente')
   };
 }
 
@@ -567,8 +571,15 @@ export const dbService = {
     }
 
     try {
-      const payload = mapPassagemToDB(nova);
-      const { error } = await supabase.from('resumos_passagem').insert([payload]);
+      const payload: any = mapPassagemToDB(nova);
+      let { error } = await supabase.from('resumos_passagem').insert([payload]);
+
+      // Fallback gracioso caso a tabela no Supabase não tenha as novas colunas data_hora_conclusao ou status
+      if (error && (error.code === '42703' || error.message?.includes('column'))) {
+        const { data_hora_conclusao, status, ...payloadLegado } = payload;
+        const retry = await supabase.from('resumos_passagem').insert([payloadLegado]);
+        error = retry.error;
+      }
 
       if (error) {
         console.error('Erro ao inserir passagem no Supabase:', error);
@@ -587,6 +598,99 @@ export const dbService = {
         storage: 'local',
         error: `Erro ao enviar para Supabase: ${err?.message || err}`
       };
+    }
+  },
+
+  async updatePassagem(item: ResumoPassagem): Promise<DbOperationResult> {
+    const local = getLocalPassagens();
+    const atualizado = local.map((p) => (p.id === item.id ? item : p));
+    setLocalPassagens(atualizado);
+
+    if (!isSupabaseConfigured || !supabase) {
+      return { success: true, storage: 'local' };
+    }
+
+    try {
+      const payload: any = mapPassagemToDB(item);
+      let { error } = await supabase.from('resumos_passagem').update(payload).eq('id', item.id);
+
+      if (error && (error.code === '42703' || error.message?.includes('column'))) {
+        const { data_hora_conclusao, status, ...payloadLegado } = payload;
+        const retry = await supabase.from('resumos_passagem').update(payloadLegado).eq('id', item.id);
+        error = retry.error;
+      }
+
+      if (error) {
+        console.error('Erro ao atualizar passagem no Supabase:', error);
+        return { success: false, storage: 'local', errorCode: error.code, error: error.message };
+      }
+      return { success: true, storage: 'supabase' };
+    } catch (err: any) {
+      return { success: false, storage: 'local', error: err?.message };
+    }
+  },
+
+  async updateStatusPassagem(id: string, newStatus: 'Pendente' | 'Concluído', dataHoraConclusao?: string): Promise<DbOperationResult> {
+    const local = getLocalPassagens();
+    let updatedItem: ResumoPassagem | undefined;
+
+    const atualizado = local.map((p) => {
+      if (p.id === id) {
+        const isConcluido = newStatus === 'Concluído';
+        const conclDate = isConcluido ? (dataHoraConclusao || p.dataHoraConclusao || new Date().toISOString()) : undefined;
+        updatedItem = {
+          ...p,
+          status: newStatus,
+          dataHoraConclusao: conclDate
+        };
+        return updatedItem;
+      }
+      return p;
+    });
+    setLocalPassagens(atualizado);
+
+    if (!isSupabaseConfigured || !supabase || !updatedItem) {
+      return { success: true, storage: 'local' };
+    }
+
+    try {
+      const payload: any = mapPassagemToDB(updatedItem);
+      let { error } = await supabase.from('resumos_passagem').update(payload).eq('id', id);
+
+      if (error && (error.code === '42703' || error.message?.includes('column'))) {
+        const { data_hora_conclusao, status, ...payloadLegado } = payload;
+        const retry = await supabase.from('resumos_passagem').update(payloadLegado).eq('id', id);
+        error = retry.error;
+      }
+
+      if (error) {
+        console.error('Erro ao atualizar status da passagem no Supabase:', error);
+        return { success: false, storage: 'local', errorCode: error.code, error: error.message };
+      }
+      return { success: true, storage: 'supabase' };
+    } catch (err: any) {
+      return { success: false, storage: 'local', error: err?.message };
+    }
+  },
+
+  async deletePassagem(id: string): Promise<DbOperationResult> {
+    const local = getLocalPassagens();
+    const atualizado = local.filter((p) => p.id !== id);
+    setLocalPassagens(atualizado);
+
+    if (!isSupabaseConfigured || !supabase) {
+      return { success: true, storage: 'local' };
+    }
+
+    try {
+      const { error } = await supabase.from('resumos_passagem').delete().eq('id', id);
+      if (error) {
+        console.error('Erro ao excluir passagem no Supabase:', error);
+        return { success: false, storage: 'local', errorCode: error.code, error: error.message };
+      }
+      return { success: true, storage: 'supabase' };
+    } catch (err: any) {
+      return { success: false, storage: 'local', error: err?.message };
     }
   },
 

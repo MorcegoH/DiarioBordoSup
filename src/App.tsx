@@ -81,6 +81,27 @@ export default function App() {
     return await dbService.addPassagem(novaPassagem);
   }, []);
 
+  const handleUpdatePassagem = useCallback(async (updated: ResumoPassagem) => {
+    setPassagens((prev) =>
+      prev.map((p) => (p.id === updated.id ? updated : p))
+    );
+    return await dbService.updatePassagem(updated);
+  }, []);
+
+  const handleUpdatePassagemStatus = useCallback(async (id: string, newStatus: 'Pendente' | 'Concluído') => {
+    const isConcluido = newStatus === 'Concluído';
+    const conclDate = isConcluido ? new Date().toISOString() : undefined;
+    setPassagens((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, status: newStatus, dataHoraConclusao: conclDate } : p))
+    );
+    return await dbService.updateStatusPassagem(id, newStatus, conclDate);
+  }, []);
+
+  const handleDeletePassagem = useCallback(async (id: string) => {
+    setPassagens((prev) => prev.filter((p) => p.id !== id));
+    return await dbService.deletePassagem(id);
+  }, []);
+
   const handleResetData = useCallback(async () => {
     const senhaInput = window.prompt('Confirmação de Segurança: Informe a senha de autorização para zerar o banco de dados e registros:');
     if (verifyAdminAuthorization(senhaInput)) {
@@ -155,6 +176,9 @@ export default function App() {
             ocorrencias={ocorrencias}
             passagens={passagens}
             onSavePassagem={handleSavePassagem}
+            onUpdatePassagem={handleUpdatePassagem}
+            onUpdateStatusPassagem={handleUpdatePassagemStatus}
+            onDeletePassagem={handleDeletePassagem}
           />
         )}
 

@@ -49,8 +49,15 @@ CREATE TABLE public.resumos_passagem (
   supervisor TEXT NOT NULL,
   o_que_funcionou TEXT NOT NULL,
   o_que_fica_pendente TEXT NOT NULL,
-  data_hora_criacao TIMESTAMPTZ NOT NULL
+  data_hora_criacao TIMESTAMPTZ NOT NULL,
+  data_hora_conclusao TIMESTAMPTZ,
+  status TEXT DEFAULT 'Pendente'
 );
+
+-- Adicionar colunas se tabela já foi criada anteriormente
+ALTER TABLE public.resumos_passagem ADD COLUMN IF NOT EXISTS o_que_fica_pendente TEXT;
+ALTER TABLE public.resumos_passagem ADD COLUMN IF NOT EXISTS data_hora_conclusao TIMESTAMPTZ;
+ALTER TABLE public.resumos_passagem ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'Pendente';
 
 -- 4. ATIVAR ROW LEVEL SECURITY (RLS) PARA SEGURANÇA
 ALTER TABLE public.ocorrencias ENABLE ROW LEVEL SECURITY;

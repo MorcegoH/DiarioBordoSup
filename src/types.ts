@@ -45,7 +45,7 @@ export interface Ocorrencia {
 }
 
 /**
- * Representa o registro de Fechamento de Turno / Resumo Diário.
+ * Representa o registro de Fechamento de Turno / Resumo Diário e Pendências.
  */
 export interface ResumoPassagem {
   id: string;
@@ -53,7 +53,9 @@ export interface ResumoPassagem {
   supervisor: string;
   oQueFuncionou: string;
   oQueFicaPendente: string;
-  dataHoraCriacao: string;
+  dataHoraCriacao: string; // ISO string de criação do registro
+  dataHoraConclusao?: string; // ISO string de conclusão da pendência
+  status?: 'Pendente' | 'Concluído';
 }
 
 /**
