@@ -4,7 +4,7 @@
  * Utiliza Recharts para gráficos de gestão à vista e relatórios executivos para Sales Ops.
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Ocorrencia, SolicitacaoDesconto } from '../types';
 import { detectCategoryAnomalies } from '../utils/statisticalAnalysis';
 import { DiscountBIDashboard } from './discounts/DiscountBIDashboard';
@@ -12,14 +12,94 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend
 } from 'recharts';
 import { 
-  BarChart3, AlertOctagon, CheckCircle, 
+  BarChart3, AlertOctagon, CheckCircle, AlertTriangle,
   ShieldAlert, Activity, Sparkles, TrendingUp, Clock, Timer, Hourglass,
-  Layers, Flame
+  Layers, Flame, Calendar, ChevronDown, Filter, RotateCcw, Check, CalendarDays,
+  X
 } from 'lucide-react';
+
+export type TipoPeriodoDashboard = 
+  | 'mes_atual' 
+  | 'mes_anterior' 
+  | 'ultimos_7_dias' 
+  | 'ultimos_30_dias' 
+  | 'personalizado' 
+  | 'todos';
 
 interface AnalyticsDashboardProps {
   ocorrencias: Ocorrencia[];
   solicitacoes?: SolicitacaoDesconto[];
+}
+
+/**
+ * Retorna as datas de início e fim no formato YYYY-MM-DD para cada preset
+ */
+function calcularDatasPreset(tipo: TipoPeriodoDashboard): { inicio: string; fim: string; label: string; mesAnoIso?: string } {
+  const agora = new Date();
+  const ano = agora.getFullYear();
+  const mes = agora.getMonth(); // 0 a 11
+
+  if (tipo === 'mes_atual') {
+    const dataFim = new Date(ano, mes + 1, 0);
+    const mesFormatado = String(mes + 1).padStart(2, '0');
+    const nomeMes = agora.toLocaleString('pt-BR', { month: 'long' });
+    const nomeCapitalizado = nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1);
+    return {
+      inicio: `${ano}-${mesFormatado}-01`,
+      fim: `${ano}-${mesFormatado}-${String(dataFim.getDate()).padStart(2, '0')}`,
+      label: `Mês Vigente (${nomeCapitalizado}/${ano})`,
+      mesAnoIso: `${ano}-${mesFormatado}`
+    };
+  }
+
+  if (tipo === 'mes_anterior') {
+    const dataInicio = new Date(ano, mes - 1, 1);
+    const dataFim = new Date(ano, mes, 0);
+    const anoAnt = dataInicio.getFullYear();
+    const mesAntFormatado = String(dataInicio.getMonth() + 1).padStart(2, '0');
+    const nomeMes = dataInicio.toLocaleString('pt-BR', { month: 'long' });
+    const nomeCapitalizado = nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1);
+    return {
+      inicio: `${anoAnt}-${mesAntFormatado}-01`,
+      fim: `${anoAnt}-${mesAntFormatado}-${String(dataFim.getDate()).padStart(2, '0')}`,
+      label: `Mês Anterior (${nomeCapitalizado}/${anoAnt})`,
+      mesAnoIso: `${anoAnt}-${mesAntFormatado}`
+    };
+  }
+
+  if (tipo === 'ultimos_7_dias') {
+    const dInicio = new Date(agora);
+    dInicio.setDate(dInicio.getDate() - 6);
+    return {
+      inicio: dInicio.toISOString().slice(0, 10),
+      fim: agora.toISOString().slice(0, 10),
+      label: 'Últimos 7 dias'
+    };
+  }
+
+  if (tipo === 'ultimos_30_dias') {
+    const dInicio = new Date(agora);
+    dInicio.setDate(dInicio.getDate() - 29);
+    return {
+      inicio: dInicio.toISOString().slice(0, 10),
+      fim: agora.toISOString().slice(0, 10),
+      label: 'Últimos 30 dias'
+    };
+  }
+
+  if (tipo === 'todos') {
+    return {
+      inicio: '',
+      fim: '',
+      label: 'Todo o Histórico'
+    };
+  }
+
+  return {
+    inicio: '',
+    fim: '',
+    label: 'Personalizado'
+  };
 }
 
 export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = React.memo(({ 
@@ -27,19 +107,97 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = React.memo(
   solicitacoes 
 }) => {
   const [subAbaAtiva, setSubAbaAtiva] = useState<'todos' | 'ocorrencias' | 'descontos'>('todos');
-  // Análise de Anomalias Memoizada
-  const anomalias = useMemo(() => detectCategoryAnomalies(ocorrencias), [ocorrencias]);
+  
+  // FILTRO GERAL DE DATA: Por padrão sempre carrega no MÊS EM VIGOR
+  const [tipoPeriodo, setTipoPeriodo] = useState<TipoPeriodoDashboard>('mes_atual');
+  const presetAtual = useMemo(() => calcularDatasPreset('mes_atual'), []);
+  const [dataInicioCustom, setDataInicioCustom] = useState<string>(presetAtual.inicio);
+  const [dataFimCustom, setDataFimCustom] = useState<string>(presetAtual.fim);
+  const [isMenuFiltroAberto, setIsMenuFiltroAberto] = useState<boolean>(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Fecha dropdown ao clicar fora
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsMenuFiltroAberto(false);
+      }
+    }
+    if (isMenuFiltroAberto) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isMenuFiltroAberto]);
+
+  // Filtragem de Ocorrências e Definição do Período Ativo
+  const { ocorrenciasFiltradas, labelPeriodoAtivo, mesAnoAtivo, dataInicioAtiva, dataFimAtiva } = useMemo(() => {
+    let inicio = '';
+    let fim = '';
+    let label = '';
+    let mesAnoIso: string | undefined = undefined;
+
+    if (tipoPeriodo === 'personalizado') {
+      inicio = dataInicioCustom;
+      fim = dataFimCustom;
+      if (inicio && fim) {
+        const dIniFmt = inicio.split('-').reverse().join('/');
+        const dFimFmt = fim.split('-').reverse().join('/');
+        label = `${dIniFmt} a ${dFimFmt}`;
+      } else {
+        label = 'Personalizado';
+      }
+    } else {
+      const preset = calcularDatasPreset(tipoPeriodo);
+      inicio = preset.inicio;
+      fim = preset.fim;
+      label = preset.label;
+      mesAnoIso = preset.mesAnoIso;
+    }
+
+    if (!inicio && !fim) {
+      return {
+        ocorrenciasFiltradas: ocorrencias,
+        labelPeriodoAtivo: label || 'Todo o Histórico',
+        mesAnoAtivo: undefined,
+        dataInicioAtiva: '',
+        dataFimAtiva: ''
+      };
+    }
+
+    const startMs = inicio ? new Date(`${inicio}T00:00:00`).getTime() : -Infinity;
+    const endMs = fim ? new Date(`${fim}T23:59:59.999`).getTime() : Infinity;
+
+    const filtradas = ocorrencias.filter((oc) => {
+      if (!oc.dataHora) return false;
+      const ocMs = new Date(oc.dataHora).getTime();
+      if (isNaN(ocMs)) return true;
+      return ocMs >= startMs && ocMs <= endMs;
+    });
+
+    return {
+      ocorrenciasFiltradas: filtradas,
+      labelPeriodoAtivo: label,
+      mesAnoAtivo: mesAnoIso,
+      dataInicioAtiva: inicio,
+      dataFimAtiva: fim
+    };
+  }, [ocorrencias, tipoPeriodo, dataInicioCustom, dataFimCustom]);
+
+  // Análise de Anomalias Memoizada sobre os dados filtrados
+  const anomalias = useMemo(() => detectCategoryAnomalies(ocorrenciasFiltradas), [ocorrenciasFiltradas]);
   const anomaliasCriticas = useMemo(() => anomalias.filter(a => a.isOutlier), [anomalias]);
 
-  // Métrica KPIs Memoizada
+  // Métrica KPIs Memoizada sobre os dados filtrados
   const { total, criticos, resolvidos, taxaResolução, totalTempoMinutos, mttrMinutos } = useMemo(() => {
-    const tot = ocorrencias.length;
+    const tot = ocorrenciasFiltradas.length;
     let crit = 0;
     let res = 0;
     let somaMinutos = 0;
 
     for (let i = 0; i < tot; i++) {
-      const oc = ocorrencias[i];
+      const oc = ocorrenciasFiltradas[i];
       if (oc.impacto === 'Crítico') crit++;
       if (oc.status === 'Resolvido') res++;
 
@@ -63,13 +221,13 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = React.memo(
       totalTempoMinutos: somaMinutos,
       mttrMinutos: mttr
     };
-  }, [ocorrencias]);
+  }, [ocorrenciasFiltradas]);
 
   // Distribuição por Categoria para gráfico de barras Memoizada
   const chartDataCategoria = useMemo(() => {
     const categoriasCount: Record<string, number> = {};
-    for (let i = 0; i < ocorrencias.length; i++) {
-      const cat = ocorrencias[i].categoria;
+    for (let i = 0; i < ocorrenciasFiltradas.length; i++) {
+      const cat = ocorrenciasFiltradas[i].categoria;
       categoriasCount[cat] = (categoriasCount[cat] || 0) + 1;
     }
 
@@ -77,14 +235,14 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = React.memo(
       categoria,
       total: totalCount
     }));
-  }, [ocorrencias]);
+  }, [ocorrenciasFiltradas]);
 
   // Análise de Tempo de Impacto por Categoria Memoizada
   const chartDataTempoImpacto = useMemo(() => {
     const tempoPorCategoria: Record<string, { totalMinutos: number; count: number; criticosMin: number }> = {};
 
-    for (let i = 0; i < ocorrencias.length; i++) {
-      const oc = ocorrencias[i];
+    for (let i = 0; i < ocorrenciasFiltradas.length; i++) {
+      const oc = ocorrenciasFiltradas[i];
       const cat = oc.categoria;
 
       let min = oc.duracaoMinutos || 0;
@@ -116,24 +274,48 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = React.memo(
         quantidade: data.count
       };
     }).sort((a, b) => b.horasImpacto - a.horasImpacto);
-  }, [ocorrencias]);
+  }, [ocorrenciasFiltradas]);
 
-  // Distribuição por Impacto para gráfico de pizza (Donut) Memoizada
-  const chartDataImpacto = useMemo(() => {
+  // Distribuição por Impacto para gráfico de pizza (Donut) & Resumo Executivo Memoizada
+  const { chartDataImpacto, resumoSeveridade } = useMemo(() => {
     const impactosCount: Record<string, number> = { Baixo: 0, Médio: 0, Crítico: 0 };
-    for (let i = 0; i < ocorrencias.length; i++) {
-      const imp = ocorrencias[i].impacto;
+    for (let i = 0; i < ocorrenciasFiltradas.length; i++) {
+      const imp = ocorrenciasFiltradas[i].impacto;
       if (impactosCount[imp] !== undefined) {
         impactosCount[imp]++;
       }
     }
 
-    return [
-      { name: 'Baixo', value: impactosCount['Baixo'], color: '#10b981' },
-      { name: 'Médio', value: impactosCount['Médio'], color: '#f59e0b' },
-      { name: 'Crítico', value: impactosCount['Crítico'], color: '#ef4444' }
+    const totalImpactos = ocorrenciasFiltradas.length;
+    const qtdCritico = impactosCount['Crítico'] || 0;
+    const qtdMedio = impactosCount['Médio'] || 0;
+    const qtdBaixo = impactosCount['Baixo'] || 0;
+
+    const pctCritico = totalImpactos > 0 ? Math.round((qtdCritico / totalImpactos) * 100) : 0;
+    const pctMedio = totalImpactos > 0 ? Math.round((qtdMedio / totalImpactos) * 100) : 0;
+    const pctBaixo = totalImpactos > 0 ? Math.round((qtdBaixo / totalImpactos) * 100) : 0;
+    const pctImpactoRelevante = totalImpactos > 0 ? Math.round(((qtdCritico + qtdMedio) / totalImpactos) * 100) : 0;
+
+    const chartData = [
+      { name: 'Baixo', value: qtdBaixo, color: '#10b981', percentualCalculado: pctBaixo },
+      { name: 'Médio', value: qtdMedio, color: '#f59e0b', percentualCalculado: pctMedio },
+      { name: 'Crítico', value: qtdCritico, color: '#ef4444', percentualCalculado: pctCritico }
     ].filter(d => d.value > 0);
-  }, [ocorrencias]);
+
+    return {
+      chartDataImpacto: chartData,
+      resumoSeveridade: {
+        total: totalImpactos,
+        qtdCritico,
+        qtdMedio,
+        qtdBaixo,
+        pctCritico,
+        pctMedio,
+        pctBaixo,
+        pctImpactoRelevante
+      }
+    };
+  }, [ocorrenciasFiltradas]);
 
   return (
     <div className="space-y-6">
@@ -151,7 +333,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = React.memo(
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
-            Visão Geral Completa (Todos os Painéis)
+            Visão Geral Completa
           </button>
 
           <button
@@ -164,7 +346,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = React.memo(
             }`}
           >
             <Activity className="w-3.5 h-3.5" />
-            Ocorrências & Anomalias Z-Score
+            Ocorrências
           </button>
 
           <button
@@ -177,13 +359,207 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = React.memo(
             }`}
           >
             <Flame className="w-3.5 h-3.5 text-amber-400" />
-            Dashboard - Descontos
+            Descontos
           </button>
         </div>
 
-        <span className="text-[11px] text-gray-500 font-medium px-2">
-          {subAbaAtiva === 'todos' ? 'Exibindo Ocorrências + BI Descontos' : subAbaAtiva === 'descontos' ? 'Foco em Burn Rate, SLA & Recorrência' : 'Foco em Incidentes Operacionais'}
-        </span>
+        {/* FILTRO GERAL DE DATAS & PERÍODO */}
+        <div className="relative" ref={dropdownRef}>
+          <button
+            type="button"
+            onClick={() => setIsMenuFiltroAberto(!isMenuFiltroAberto)}
+            className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 active:bg-gray-200 border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 transition-all cursor-pointer shadow-2xs"
+            title="Clique para filtrar o período de visualização do Dashboard"
+          >
+            <Calendar className="w-3.5 h-3.5 text-primary-green shrink-0" />
+            <span className="truncate max-w-[200px] sm:max-w-[240px]">
+              {labelPeriodoAtivo}
+            </span>
+            <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-[#005b2e] font-bold text-[10px] shrink-0">
+              {total} {total === 1 ? 'reg.' : 'regs.'}
+            </span>
+            <ChevronDown className={`w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform duration-200 ${isMenuFiltroAberto ? 'rotate-180 text-primary-green' : ''}`} />
+          </button>
+
+          {/* Menu Dropdown Suspenso do Filtro de Período */}
+          {isMenuFiltroAberto && (
+            <div className="absolute right-0 top-full mt-1.5 w-80 bg-white rounded-xl shadow-xl border border-gray-200 z-50 p-3.5 animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-gray-100">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800">
+                  <Filter className="w-3.5 h-3.5 text-primary-green" />
+                  Filtrar Período de Análise
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTipoPeriodo('mes_atual');
+                    const preset = calcularDatasPreset('mes_atual');
+                    setDataInicioCustom(preset.inicio);
+                    setDataFimCustom(preset.fim);
+                    setIsMenuFiltroAberto(false);
+                  }}
+                  className="text-[10px] text-gray-500 hover:text-primary-green font-medium flex items-center gap-1 cursor-pointer"
+                  title="Redefinir para o mês em vigor"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  Mês Atual
+                </button>
+              </div>
+
+              {/* Opções Rápidas Pré-definidas */}
+              <div className="space-y-1 mb-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTipoPeriodo('mes_atual');
+                    const preset = calcularDatasPreset('mes_atual');
+                    setDataInicioCustom(preset.inicio);
+                    setDataFimCustom(preset.fim);
+                    setIsMenuFiltroAberto(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                    tipoPeriodo === 'mes_atual'
+                      ? 'bg-emerald-50 text-[#005b2e] font-bold border border-emerald-200'
+                      : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    {calcularDatasPreset('mes_atual').label}
+                  </span>
+                  {tipoPeriodo === 'mes_atual' && <Check className="w-3.5 h-3.5 text-[#005b2e]" />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTipoPeriodo('mes_anterior');
+                    const preset = calcularDatasPreset('mes_anterior');
+                    setDataInicioCustom(preset.inicio);
+                    setDataFimCustom(preset.fim);
+                    setIsMenuFiltroAberto(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                    tipoPeriodo === 'mes_anterior'
+                      ? 'bg-emerald-50 text-[#005b2e] font-bold border border-emerald-200'
+                      : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-sky-500" />
+                    {calcularDatasPreset('mes_anterior').label}
+                  </span>
+                  {tipoPeriodo === 'mes_anterior' && <Check className="w-3.5 h-3.5 text-[#005b2e]" />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTipoPeriodo('ultimos_7_dias');
+                    const preset = calcularDatasPreset('ultimos_7_dias');
+                    setDataInicioCustom(preset.inicio);
+                    setDataFimCustom(preset.fim);
+                    setIsMenuFiltroAberto(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                    tipoPeriodo === 'ultimos_7_dias'
+                      ? 'bg-emerald-50 text-[#005b2e] font-bold border border-emerald-200'
+                      : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                    Últimos 7 dias
+                  </span>
+                  {tipoPeriodo === 'ultimos_7_dias' && <Check className="w-3.5 h-3.5 text-[#005b2e]" />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTipoPeriodo('ultimos_30_dias');
+                    const preset = calcularDatasPreset('ultimos_30_dias');
+                    setDataInicioCustom(preset.inicio);
+                    setDataFimCustom(preset.fim);
+                    setIsMenuFiltroAberto(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                    tipoPeriodo === 'ultimos_30_dias'
+                      ? 'bg-emerald-50 text-[#005b2e] font-bold border border-emerald-200'
+                      : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                    Últimos 30 dias
+                  </span>
+                  {tipoPeriodo === 'ultimos_30_dias' && <Check className="w-3.5 h-3.5 text-[#005b2e]" />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTipoPeriodo('todos');
+                    setIsMenuFiltroAberto(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                    tipoPeriodo === 'todos'
+                      ? 'bg-emerald-50 text-[#005b2e] font-bold border border-emerald-200'
+                      : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-gray-400" />
+                    Todo o Histórico (Sem filtro de data)
+                  </span>
+                  {tipoPeriodo === 'todos' && <Check className="w-3.5 h-3.5 text-[#005b2e]" />}
+                </button>
+              </div>
+
+              {/* Seção Intervalo Customizado */}
+              <div className="pt-2.5 border-t border-gray-100">
+                <p className="text-[11px] font-bold text-gray-700 mb-2 flex items-center gap-1">
+                  <CalendarDays className="w-3 h-3 text-gray-500" />
+                  Intervalo Customizado (De / Até)
+                </p>
+                <div className="grid grid-cols-2 gap-2 mb-2.5">
+                  <div>
+                    <label className="block text-[10px] font-medium text-gray-500 mb-0.5">Início</label>
+                    <input
+                      type="date"
+                      value={dataInicioCustom}
+                      onChange={(e) => setDataInicioCustom(e.target.value)}
+                      className="w-full text-xs p-1.5 border border-gray-300 rounded-md focus:ring-1 focus:ring-primary-green focus:border-primary-green bg-white text-gray-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-medium text-gray-500 mb-0.5">Fim</label>
+                    <input
+                      type="date"
+                      value={dataFimCustom}
+                      onChange={(e) => setDataFimCustom(e.target.value)}
+                      className="w-full text-xs p-1.5 border border-gray-300 rounded-md focus:ring-1 focus:ring-primary-green focus:border-primary-green bg-white text-gray-800"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (dataInicioCustom && dataFimCustom) {
+                      setTipoPeriodo('personalizado');
+                      setIsMenuFiltroAberto(false);
+                    }
+                  }}
+                  disabled={!dataInicioCustom || !dataFimCustom}
+                  className="w-full py-1.5 bg-[#005b2e] hover:bg-[#004a25] disabled:bg-gray-300 text-white rounded-md text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Aplicar Período
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* SEÇÃO 1: OCORRÊNCIAS OPERACIONAIS */}
@@ -412,9 +788,9 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = React.memo(
                 <BarChart3 className="w-4 h-4 text-primary-green" />
                 Distribuição de Incidentes por Categoria
               </h3>
-              <div className="h-64">
+              <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartDataCategoria} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
+                  <BarChart data={chartDataCategoria} margin={{ top: 10, right: 10, left: -20, bottom: 25 }}>
                     <XAxis 
                       dataKey="categoria" 
                       tick={{ fontSize: 10 }} 
@@ -436,33 +812,133 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = React.memo(
               </div>
             </div>
 
-            {/* Gráfico 2: Severidade de Impacto na Operação */}
-            <div className="corporate-card p-5">
-              <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <ShieldAlert className="w-4 h-4 text-primary-green" />
-                Nível de Severidade de Impacto Operacional
-              </h3>
-              <div className="h-64 flex items-center justify-center">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={chartDataImpacto}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={55}
-                      outerRadius={85}
-                      paddingAngle={5}
-                      dataKey="value"
-                      label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                    >
-                      {chartDataImpacto.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderRadius: '8px', color: '#fff', fontSize: '12px' }} />
-                    <Legend verticalAlign="bottom" height={36} iconType="circle" />
-                  </PieChart>
-                </ResponsiveContainer>
+            {/* Gráfico 2: Severidade de Impacto na Operação (Redesenhado - Visão Executiva) */}
+            <div className="corporate-card p-5 flex flex-col justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-gray-800 mb-1 flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 text-primary-green" />
+                  Nível de Severidade de Impacto Operacional
+                </h3>
+              </div>
+
+              {/* Área do Gráfico Donut Centralizado com KPI central */}
+              <div className="relative h-56 flex items-center justify-center my-1">
+                {resumoSeveridade.total === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-xs text-gray-400 font-medium">Nenhuma ocorrência para análise de impacto</p>
+                  </div>
+                ) : (
+                  <>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart margin={{ top: 12, right: 30, bottom: 12, left: 30 }}>
+                        <Pie
+                          data={chartDataImpacto}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={56}
+                          outerRadius={84}
+                          paddingAngle={4}
+                          dataKey="value"
+                          labelLine={{ stroke: '#94a3b8', strokeWidth: 1.2 }}
+                          label={({ value }) => {
+                            if (!resumoSeveridade.total || value <= 0) return '';
+                            const pct = Math.round((value / resumoSeveridade.total) * 100);
+                            return `${pct}%`;
+                          }}
+                        >
+                          {chartDataImpacto.map((entry, index) => (
+                            <Cell 
+                              key={`cell-${index}`} 
+                              fill={entry.color} 
+                              stroke="#ffffff" 
+                              strokeWidth={3} 
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          formatter={(value: any, name: string) => [
+                            `${value} ${Number(value) === 1 ? 'ocorrência' : 'ocorrências'} (${resumoSeveridade.total > 0 ? Math.round((Number(value) / resumoSeveridade.total) * 100) : 0}%)`,
+                            `Severidade: ${name}`
+                          ]}
+                          contentStyle={{ backgroundColor: '#1e293b', borderRadius: '8px', color: '#fff', fontSize: '12px' }} 
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+
+                    {/* KPI Centralizador: Total de Ocorrências */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                      <span className="text-3xl font-extrabold text-gray-900 tracking-tight leading-none">
+                        {resumoSeveridade.total}
+                      </span>
+                      <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mt-1">
+                        {resumoSeveridade.total === 1 ? 'Ocorrência' : 'Ocorrências'}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Legenda Estruturada & Ordenada por Severidade (Crítico -> Médio -> Baixo) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 pb-3 border-t border-gray-100">
+                {/* 1. Crítico */}
+                <div className="bg-red-50/40 rounded-lg p-2 text-center border border-red-100/60">
+                  <div className="inline-flex items-center gap-1.5 justify-center mb-0.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#ef4444] shrink-0" />
+                    <span className="text-xs font-bold text-gray-900">Crítico</span>
+                  </div>
+                  <p className="text-[11px] text-gray-600 font-medium">
+                    {resumoSeveridade.qtdCritico} {resumoSeveridade.qtdCritico === 1 ? 'ocorrência' : 'ocorrências'} · <span className="font-semibold text-red-600">{resumoSeveridade.pctCritico}%</span>
+                  </p>
+                </div>
+
+                {/* 2. Médio */}
+                <div className="bg-amber-50/40 rounded-lg p-2 text-center border border-amber-100/60">
+                  <div className="inline-flex items-center gap-1.5 justify-center mb-0.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#f59e0b] shrink-0" />
+                    <span className="text-xs font-bold text-gray-900">Médio</span>
+                  </div>
+                  <p className="text-[11px] text-gray-600 font-medium">
+                    {resumoSeveridade.qtdMedio} {resumoSeveridade.qtdMedio === 1 ? 'ocorrência' : 'ocorrências'} · <span className="font-semibold text-amber-600">{resumoSeveridade.pctMedio}%</span>
+                  </p>
+                </div>
+
+                {/* 3. Baixo */}
+                <div className="bg-emerald-50/40 rounded-lg p-2 text-center border border-emerald-100/60">
+                  <div className="inline-flex items-center gap-1.5 justify-center mb-0.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#10b981] shrink-0" />
+                    <span className="text-xs font-bold text-gray-900">Baixo</span>
+                  </div>
+                  <p className="text-[11px] text-gray-600 font-medium">
+                    {resumoSeveridade.qtdBaixo} {resumoSeveridade.qtdBaixo === 1 ? 'ocorrência' : 'ocorrências'} · <span className="font-semibold text-emerald-700">{resumoSeveridade.pctBaixo}%</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Insight Executivo Dinâmico */}
+              <div className={`mt-1 p-2.5 rounded-lg border text-xs flex items-center gap-2 ${
+                resumoSeveridade.total === 0 
+                  ? 'bg-gray-50 border-gray-200 text-gray-600'
+                  : resumoSeveridade.pctImpactoRelevante > 0
+                    ? 'bg-amber-50/80 border-amber-200 text-amber-950'
+                    : 'bg-emerald-50/80 border-emerald-200 text-emerald-950'
+              }`}>
+                {resumoSeveridade.total === 0 ? (
+                  <span>Nenhuma ocorrência registrada no período selecionado.</span>
+                ) : resumoSeveridade.pctImpactoRelevante > 0 ? (
+                  <>
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>
+                      <strong className="font-bold text-amber-900">Atenção:</strong> {resumoSeveridade.pctImpactoRelevante}% das ocorrências apresentam impacto Médio ou Crítico.
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>
+                      <strong className="font-bold text-emerald-900">Estável:</strong> 100% das ocorrências apresentam impacto Baixo sem risco crítico ou moderado.
+                    </span>
+                  </>
+                )}
               </div>
             </div>
 
@@ -472,7 +948,10 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = React.memo(
 
       {/* SEÇÃO 2: DASHBOARD BI - DESCONTOS & ANÁLISE PREDITIVA (HEDER SANTOS) */}
       {(subAbaAtiva === 'todos' || subAbaAtiva === 'descontos') && (
-        <DiscountBIDashboard solicitacoesProp={solicitacoes} />
+        <DiscountBIDashboard 
+          solicitacoesProp={solicitacoes} 
+          mesSelecionado={mesAnoAtivo}
+        />
       )}
 
     </div>

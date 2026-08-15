@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, BarChart3, ClipboardList, RefreshCw, Sparkles, Clock, Download, Database, CheckCircle2, ServerOff, BadgePercent } from 'lucide-react';
+import { ShieldCheck, BarChart3, ClipboardList, Sparkles, Clock, Download, Database, CheckCircle2, ServerOff, BadgePercent } from 'lucide-react';
 import { dbService, DbHealthStatus } from '../services/dbService';
 import { DatabaseErrorModal } from './DatabaseErrorModal';
 import { Ocorrencia, ResumoPassagem } from '../types';
@@ -17,7 +17,6 @@ interface HeaderProps {
   totalCriticos: number;
   ocorrencias: Ocorrencia[];
   passagens: ResumoPassagem[];
-  onResetData: () => void;
   onExportCSV: () => void;
   onDataSynced?: () => void;
   isDarkMode?: boolean;
@@ -31,7 +30,6 @@ export const Header: React.FC<HeaderProps> = React.memo(({
   totalCriticos,
   ocorrencias,
   passagens,
-  onResetData,
   onExportCSV,
   onDataSynced,
   isDarkMode = true,
@@ -170,24 +168,27 @@ export const Header: React.FC<HeaderProps> = React.memo(({
                 </div>
               )}
 
-              {/* Botão de Exportar CSV */}
-
+              {/* ARQUITETURA REFATORADA: Botão de Exportar CSV com Consciência Contextual de Aba */}
               <button
+                id="btn-global-export-csv"
                 onClick={onExportCSV}
-                title="Exportar dados limpos para Excel/CSV"
-                className="p-2 bg-emerald-800 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1 border border-emerald-600/60 shadow-xs"
+                title={
+                  activeTab === 'descontos'
+                    ? 'Exportar Solicitações de Desconto para Excel/CSV'
+                    : activeTab === 'passagem'
+                    ? 'Exportar Fechamentos de Turno e Pendências para Excel/CSV'
+                    : 'Exportar Histórico de Ocorrências para Excel/CSV'
+                }
+                className="p-2 sm:px-3 sm:py-1.5 bg-emerald-800 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 border border-emerald-600/60 shadow-xs cursor-pointer active:scale-95"
               >
                 <Download className="w-3.5 h-3.5 text-emerald-200" />
-                <span className="hidden sm:inline">Exportar CSV</span>
-              </button>
-
-              <button
-                onClick={onResetData}
-                title="Restaurar dados padrão de teste"
-                className="p-2 bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 border border-emerald-700/60"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Resetar</span>
+                <span className="hidden sm:inline">
+                  {activeTab === 'descontos'
+                    ? 'Exportar Descontos'
+                    : activeTab === 'passagem'
+                    ? 'Exportar Fechamento'
+                    : 'Exportar CSV'}
+                </span>
               </button>
             </div>
           </div>

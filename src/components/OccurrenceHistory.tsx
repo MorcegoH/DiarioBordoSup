@@ -212,12 +212,12 @@ export const OccurrenceHistory: React.FC<OccurrenceHistoryProps> = React.memo(({
         </div>
       </div>
 
-      {/* Painel de Filtros Avançados */}
-      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6 space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+      {/* Painel de Filtros Compactos e Proporcionais */}
+      <div className="bg-gray-50 p-3.5 rounded-lg border border-gray-200 mb-6 space-y-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           
           {/* Busca por texto */}
-          <div className="sm:col-span-2 relative">
+          <div className="relative flex-1 min-w-[200px] sm:min-w-[240px]">
             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
             <input
               type="text"
@@ -229,13 +229,13 @@ export const OccurrenceHistory: React.FC<OccurrenceHistoryProps> = React.memo(({
           </div>
 
           {/* Impacto */}
-          <div>
+          <div className="w-full sm:w-auto">
             <select
               value={filtros.impacto}
               onChange={(e) => setFiltros({ ...filtros, impacto: e.target.value })}
-              className="w-full px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#005b2e]"
+              className="w-full sm:w-28 px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#005b2e] cursor-pointer"
             >
-              <option value="">Todos Impactos</option>
+              <option value="">Impacto</option>
               <option value="Baixo">Baixo</option>
               <option value="Médio">Médio</option>
               <option value="Crítico">Crítico</option>
@@ -243,13 +243,13 @@ export const OccurrenceHistory: React.FC<OccurrenceHistoryProps> = React.memo(({
           </div>
 
           {/* Status */}
-          <div>
+          <div className="w-full sm:w-auto">
             <select
               value={filtros.status}
               onChange={(e) => setFiltros({ ...filtros, status: e.target.value })}
-              className="w-full px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#005b2e]"
+              className="w-full sm:w-32 px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#005b2e] cursor-pointer"
             >
-              <option value="">Todos Status</option>
+              <option value="">Status</option>
               <option value="Pendente">Pendente</option>
               <option value="Em Análise">Em Análise</option>
               <option value="Resolvido">Resolvido</option>
@@ -257,13 +257,13 @@ export const OccurrenceHistory: React.FC<OccurrenceHistoryProps> = React.memo(({
           </div>
 
           {/* Responsável / Supervisor */}
-          <div>
+          <div className="w-full sm:w-auto">
             <select
               value={filtros.supervisor}
               onChange={(e) => setFiltros({ ...filtros, supervisor: e.target.value })}
-              className="w-full px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#005b2e]"
+              className="w-full sm:w-48 px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#005b2e] cursor-pointer"
             >
-              <option value="">Todos Responsáveis</option>
+              <option value="">Liderança</option>
               <option value="Heder Santos">Heder Santos (Gerente)</option>
               <option value="Debora Rodrigues">Debora Rodrigues</option>
               <option value="Marilia Farias">Marilia Farias</option>
@@ -276,7 +276,7 @@ export const OccurrenceHistory: React.FC<OccurrenceHistoryProps> = React.memo(({
           <div className="flex justify-end pt-1">
             <button
               onClick={handleResetFiltros}
-              className="text-xs text-emerald-800 hover:text-emerald-950 font-semibold flex items-center gap-1 transition-colors"
+              className="text-xs text-emerald-800 hover:text-emerald-950 font-semibold flex items-center gap-1 transition-colors cursor-pointer"
             >
               <RotateCcw className="w-3 h-3" />
               Limpar Filtros Aplicados

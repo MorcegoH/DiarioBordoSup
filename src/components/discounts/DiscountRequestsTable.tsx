@@ -7,6 +7,7 @@
 import React, { useState, useMemo } from 'react';
 import { SolicitacaoDesconto, StatusDesconto } from '../../types';
 import { exportarDescontosCSV } from '../../data/discountData';
+import { formatarMoedaBRL, formatarPercentual } from '../../utils/finance';
 import { 
   ClipboardList, 
   Search, 
@@ -22,7 +23,9 @@ import {
   Car,
   RotateCcw,
   Calendar,
-  X
+  X,
+  User,
+  Tag
 } from 'lucide-react';
 
 interface DiscountRequestsTableProps {
@@ -222,13 +225,13 @@ export const DiscountRequestsTable: React.FC<DiscountRequestsTableProps> = React
         {/* Filtros Dropdown, Data e Busca */}
         <div className="flex flex-wrap items-center gap-2">
           
-          {/* Supervisora */}
+          {/* Supervisora / Liderança */}
           <select
             value={supervisoraFiltro}
             onChange={(e) => setSupervisoraFiltro(e.target.value)}
-            className="px-2.5 py-1.5 text-xs bg-gray-50 border border-gray-300 rounded-lg text-gray-700 font-medium"
+            className="px-2.5 py-1.5 text-xs bg-gray-50 border border-gray-300 rounded-lg text-gray-700 font-medium cursor-pointer"
           >
-            <option value="TODAS">Supervisora: Todas</option>
+            <option value="TODAS">Liderança: Todas</option>
             <option value="Débora">Débora Rodrigues</option>
             <option value="Marília">Marília Farias</option>
           </select>
@@ -244,25 +247,30 @@ export const DiscountRequestsTable: React.FC<DiscountRequestsTableProps> = React
             <option value="Plano">Plano Mensal</option>
           </select>
 
-          {/* Filtro por Data */}
-          <div className="relative flex items-center">
-            <input
-              type="date"
-              value={dataFiltro}
-              onChange={(e) => setDataFiltro(e.target.value)}
-              className={`pl-7 pr-6 py-1.5 text-xs border rounded-lg font-medium transition-all cursor-pointer ${
+          {/* Filtro por Data (Apenas Símbolo do Calendário) */}
+          <div className="relative inline-flex items-center">
+            <div
+              className={`p-2 rounded-lg border text-xs transition-all flex items-center justify-center cursor-pointer ${
                 dataFiltro 
-                  ? 'bg-emerald-50 border-emerald-400 text-emerald-900 font-bold' 
-                  : 'bg-gray-50 border-gray-300 text-gray-700 focus:bg-white focus:ring-1 focus:ring-[#005b2e]'
+                  ? 'bg-emerald-50 border-[#005b2e] text-[#005b2e] font-bold shadow-2xs' 
+                  : 'bg-gray-50 border-gray-300 text-gray-600 hover:bg-gray-100 hover:text-gray-900'
               }`}
-              title="Filtrar por data da solicitação"
-            />
-            <Calendar className="w-3.5 h-3.5 text-gray-400 absolute left-2 pointer-events-none" />
+              title={dataFiltro ? `Data selecionada: ${dataFiltro.split('-').reverse().join('/')} (Clique para alterar)` : 'Filtrar por data'}
+            >
+              <Calendar className="w-4 h-4 pointer-events-none" />
+              <input
+                type="date"
+                value={dataFiltro}
+                onChange={(e) => setDataFiltro(e.target.value)}
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                title={dataFiltro ? `Data: ${dataFiltro.split('-').reverse().join('/')}` : 'Filtrar por data'}
+              />
+            </div>
             {dataFiltro && (
               <button
                 type="button"
                 onClick={() => setDataFiltro('')}
-                className="absolute right-1.5 p-0.5 text-gray-400 hover:text-gray-700 hover:bg-gray-200 rounded cursor-pointer"
+                className="ml-1 p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
                 title="Limpar filtro de data"
               >
                 <X className="w-3 h-3" />
@@ -299,8 +307,147 @@ export const DiscountRequestsTable: React.FC<DiscountRequestsTableProps> = React
         </div>
       </div>
 
-      {/* Tabela de Dados */}
-      <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+      {/* 1. VISUALIZAÇÃO MOBILE (CARDS) - Exibida em telas menores que md (< 768px) */}
+      <div id="mobile-discount-cards-container" className="block md:hidden space-y-3">
+        {solicitacoesFiltradas.length === 0 ? (
+          <div className="text-center py-10 px-4 bg-white rounded-xl border border-gray-200 text-gray-400">
+            <ClipboardList className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+            <p className="font-semibold text-gray-600">Nenhuma solicitação encontrada</p>
+            <p className="text-xs text-gray-400 mt-1">Tente ajustar os filtros acima para ver outros registros.</p>
+          </div>
+        ) : (
+          solicitacoesFiltradas.map((item) => {
+            const sla = getSLAInfo(item.dataHoraSolicitacao, item.status);
+            const dataSolicFormatada = new Date(item.dataHoraSolicitacao).toLocaleDateString('pt-BR', {
+              day: '2-digit',
+              month: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+
+            return (
+              <div 
+                key={`card-${item.id}`} 
+                id={`discount-card-${item.id}`}
+                className="bg-white rounded-xl p-4 border border-gray-200 shadow-xs space-y-3"
+              >
+                {/* Topo do Card: Data, Placa e Status */}
+                <div className="flex items-start justify-between gap-2 border-b border-gray-100 pb-2.5">
+                  <div>
+                    <span className="text-[11px] font-bold text-gray-500 block">{dataSolicFormatada}</span>
+                    <h4 className="font-bold text-gray-900 text-sm leading-tight mt-0.5">{item.cliente}</h4>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span className="inline-flex items-center gap-1 font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-gray-100 border border-gray-300 text-gray-800">
+                      <Car className="w-3 h-3 text-gray-500" /> {item.placa}
+                    </span>
+                    <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      item.tipoDesconto === 'Adesão' 
+                        ? 'bg-blue-50 text-blue-800 border border-blue-200' 
+                        : 'bg-purple-50 text-purple-800 border border-purple-200'
+                    }`}>
+                      {item.tipoDesconto}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Dados da Equipe: Supervisora e Consultor */}
+                <div className="grid grid-cols-2 gap-2 text-xs bg-gray-50/80 p-2.5 rounded-lg">
+                  <div>
+                    <span className="text-[10px] text-gray-500 block">Supervisora:</span>
+                    <span className="font-bold text-gray-800">{item.supervisora}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-gray-500 block">Consultor:</span>
+                    <span className="font-bold text-gray-800">{item.consultor}</span>
+                  </div>
+                </div>
+
+                {/* Bloco de Valores Financeiros */}
+                <div className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-50/40 border border-emerald-100">
+                  <div>
+                    <span className="text-[10px] text-gray-500 block">Valor Cheio: {formatarMoedaBRL(item.valorCheio)}</span>
+                    <span className="text-xs font-bold text-[#005b2e]">
+                      Desconto: -{formatarMoedaBRL(item.valorDescontoCalculado)} ({formatarPercentual(item.percentualDesconto)})
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-gray-500 block">Valor Final:</span>
+                    <span className="text-sm font-extrabold text-gray-900">{formatarMoedaBRL(item.valorFinal)}</span>
+                  </div>
+                </div>
+
+                {/* Status e SLA */}
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <div>
+                    {item.status === 'Aguardando Aprovação' && (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-300">
+                          <Clock className="w-3 h-3" /> Aguardando
+                        </span>
+                        {sla && (
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${sla.badgeClass}`}>
+                            {sla.texto}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {item.status === 'Aprovado' && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-300">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-700" /> Aprovado
+                      </span>
+                    )}
+
+                    {item.status === 'Negado' && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md bg-red-50 text-red-800 border border-red-300">
+                        <XCircle className="w-3 h-3 text-red-700" /> Negado
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Ações Mobile (com área touch mínima de 44px) */}
+                  <div className="flex items-center gap-2">
+                    {item.status === 'Aguardando Aprovação' ? (
+                      <>
+                        <button
+                          id={`btn-aprovar-mobile-${item.id}`}
+                          onClick={() => onOpenAprovarModal(item)}
+                          className="min-h-[44px] px-3 py-2 bg-primary-green hover:bg-emerald-800 text-white font-bold text-xs rounded-lg shadow-xs flex items-center gap-1.5 cursor-pointer touch-manipulation"
+                        >
+                          <ShieldCheck className="w-4 h-4" />
+                          <span>Aprovar</span>
+                        </button>
+                        <button
+                          id={`btn-reprovar-mobile-${item.id}`}
+                          onClick={() => onOpenReprovarModal(item)}
+                          className="min-h-[44px] px-3 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-lg shadow-xs flex items-center gap-1.5 cursor-pointer touch-manipulation"
+                        >
+                          <XCircle className="w-4 h-4" />
+                          <span>Recusar</span>
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        id={`btn-parecer-mobile-${item.id}`}
+                        onClick={() => setDetalhesItem(item)}
+                        className="min-h-[44px] px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs rounded-lg border border-gray-300 flex items-center gap-1.5 cursor-pointer touch-manipulation"
+                      >
+                        <Eye className="w-4 h-4 text-gray-500" />
+                        <span>Ver Parecer</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* 2. VISUALIZAÇÃO DESKTOP (TABELA) - Exibida em telas médias e grandes (>= 768px) */}
+      <div id="desktop-discount-table-container" className="hidden md:block overflow-x-auto rounded-lg border border-gray-200 bg-white">
         <table className="min-w-full divide-y divide-gray-200 text-left text-xs">
           <thead className="bg-gray-50 text-gray-700 font-bold uppercase tracking-wider">
             <tr>
@@ -333,7 +480,7 @@ export const DiscountRequestsTable: React.FC<DiscountRequestsTableProps> = React
                 });
 
                 return (
-                  <tr key={item.id} className="hover:bg-emerald-50/30 transition-colors">
+                  <tr key={item.id} id={`row-desconto-${item.id}`} className="hover:bg-emerald-50/30 transition-colors">
                     
                     {/* Data / Hora */}
                     <td className="px-3.5 py-3.5 whitespace-nowrap text-gray-600">
@@ -376,17 +523,17 @@ export const DiscountRequestsTable: React.FC<DiscountRequestsTableProps> = React
                         {item.tipoDesconto}
                       </span>
                       <div className="text-[11px] text-gray-600">
-                        Cheio: R$ {item.valorCheio.toFixed(2).replace('.', ',')}
+                        Cheio: {formatarMoedaBRL(item.valorCheio)}
                       </div>
                     </td>
 
                     {/* Desconto Efetivo */}
                     <td className="px-3.5 py-3.5 whitespace-nowrap">
                       <span className="font-bold text-sm text-[#005b2e] block">
-                        - R$ {item.valorDescontoCalculado.toFixed(2).replace('.', ',')}
+                        - {formatarMoedaBRL(item.valorDescontoCalculado)}
                       </span>
                       <span className="text-[11px] text-gray-500">
-                        {item.percentualDesconto.toFixed(1).replace('.', ',')}% • Final: <strong>R$ {item.valorFinal.toFixed(2).replace('.', ',')}</strong>
+                        {formatarPercentual(item.percentualDesconto)} • Final: <strong>{formatarMoedaBRL(item.valorFinal)}</strong>
                       </span>
                     </td>
 
@@ -437,8 +584,9 @@ export const DiscountRequestsTable: React.FC<DiscountRequestsTableProps> = React
                       {item.status === 'Aguardando Aprovação' ? (
                         <div className="flex items-center justify-end gap-1.5">
                           <button
+                            id={`btn-aprovar-desktop-${item.id}`}
                             onClick={() => onOpenAprovarModal(item)}
-                            className="px-2.5 py-1 bg-primary-green hover:bg-emerald-800 text-white font-bold text-xs rounded-lg shadow-xs transition-all flex items-center gap-1 cursor-pointer"
+                            className="px-2.5 py-1.5 bg-primary-green hover:bg-emerald-800 text-white font-bold text-xs rounded-lg shadow-xs transition-all flex items-center gap-1 cursor-pointer"
                             title="Aprovar com Senha de Segurança e Parecer"
                           >
                             <ShieldCheck className="w-3.5 h-3.5" />
@@ -446,8 +594,9 @@ export const DiscountRequestsTable: React.FC<DiscountRequestsTableProps> = React
                           </button>
 
                           <button
+                            id={`btn-reprovar-desktop-${item.id}`}
                             onClick={() => onOpenReprovarModal(item)}
-                            className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-lg shadow-xs transition-all flex items-center gap-1 cursor-pointer"
+                            className="px-2.5 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-lg shadow-xs transition-all flex items-center gap-1 cursor-pointer"
                             title="Reprovar com Parecer Obrigatório"
                           >
                             <XCircle className="w-3.5 h-3.5" />
@@ -456,8 +605,9 @@ export const DiscountRequestsTable: React.FC<DiscountRequestsTableProps> = React
                         </div>
                       ) : (
                         <button
+                          id={`btn-parecer-desktop-${item.id}`}
                           onClick={() => setDetalhesItem(item)}
-                          className="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-xs rounded-lg border border-gray-300 transition-colors flex items-center gap-1 ml-auto cursor-pointer"
+                          className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-xs rounded-lg border border-gray-300 transition-colors flex items-center gap-1 ml-auto cursor-pointer"
                         >
                           <Eye className="w-3.5 h-3.5 text-gray-500" />
                           <span>Ver Parecer</span>

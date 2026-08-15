@@ -100,16 +100,24 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
     return ocorrencias.filter((oc) => oc.dataHora.startsWith(dataHojeISO));
   }, [ocorrencias, dataHojeISO]);
 
-  // Handler para Salvar Novo Registro de Fechamento
+  // Handler para Salvar Novo Registro de Fechamento (Validação Rigorosa & Sanitização)
   const handleSalvarRegistro = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // SEGURANÇA: Sanitização contra XSS e limitação de caracteres
     const cleanFuncionou = sanitizeTextInput(oQueFuncionou, 3000);
     const cleanPendente = sanitizeTextInput(oQueFicaPendente, 3000);
     const cleanSupervisor = sanitizeTextInput(supervisor, 100);
 
-    if (!cleanFuncionou && !cleanPendente) {
-      alert('Por favor, preencha o resumo do que funcionou ou o que fica pendente para o próximo turno.');
+    // VALIDAÇÃO RIGOROSA DE REGRAS DE NEGÓCIO:
+    // Garante obrigatoriedade de ambos os campos antes do envio
+    if (!cleanFuncionou || cleanFuncionou.trim().length < 5) {
+      alert('Por favor, preencha o campo obrigatório: "O que funcionou bem hoje?" (mínimo 5 caracteres).');
+      return;
+    }
+
+    if (!cleanPendente || cleanPendente.trim().length < 5) {
+      alert('Por favor, preencha o campo obrigatório: "O que fica pendente para o próximo turno / amanhã?" (mínimo 5 caracteres com SLA de 24h úteis).');
       return;
     }
 
@@ -537,7 +545,7 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
           <div>
             <h3 className="text-base sm:text-lg font-bold text-gray-800 flex items-center gap-2">
               <Calendar className="w-5 h-5 text-primary-green" />
-              Controle de Passagem de Bastão & Pendências Salvas
+              Controle de Turnos
             </h3>
             <p className="text-xs text-gray-500 font-medium">
               Clique nos cards para abrir a leitura completa. Conclusões exigem tabulação de solução.
@@ -623,20 +631,20 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
             <input
               type="text"
-              placeholder="Buscar por supervisor, pendência, o que funcionou ou solução aplicada..."
+              placeholder="Buscar por liderança, pendência, o que funcionou ou solução aplicada..."
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#005b2e]"
             />
           </div>
 
-          <div className="sm:w-56">
+          <div className="w-full sm:w-48">
             <select
               value={filtroSupervisor}
               onChange={(e) => setFiltroSupervisor(e.target.value)}
-              className="w-full px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#005b2e]"
+              className="w-full px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#005b2e] cursor-pointer"
             >
-              <option value="">Todos os Supervisores</option>
+              <option value="">Liderança</option>
               <option value="Heder Santos">Heder Santos (Gerente)</option>
               <option value="Debora Rodrigues">Debora Rodrigues</option>
               <option value="Marilia Farias">Marilia Farias</option>

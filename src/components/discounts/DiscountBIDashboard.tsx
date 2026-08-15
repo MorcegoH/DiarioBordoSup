@@ -59,31 +59,24 @@ export const DiscountBIDashboard: React.FC<DiscountBIDashboardProps> = React.mem
   mesSelecionado 
 }) => {
   const [solicitacoesLocais, setSolicitacoesLocais] = useState<SolicitacaoDesconto[]>([]);
-  const [usarSimulacaoPreditiva, setUsarSimulacaoPreditiva] = useState<boolean>(true);
+  const [usarSimulacaoPreditiva, setUsarSimulacaoPreditiva] = useState<boolean>(false);
   const [filtroSupervisora, setFiltroSupervisora] = useState<string>('Todas');
   const [buscaConsultor, setBuscaConsultor] = useState<string>('');
 
   // Carrega solicitações reais do banco/service
   useEffect(() => {
-    if (solicitacoesProp && solicitacoesProp.length > 0) {
+    if (solicitacoesProp !== undefined) {
       setSolicitacoesLocais(solicitacoesProp);
-      // Se houver mais de 3 solicitações reais, podemos desmarcar a simulação por padrão
-      if (solicitacoesProp.length >= 4) {
-        setUsarSimulacaoPreditiva(false);
-      }
     } else {
       discountService.getSolicitacoesAsync().then((dados) => {
         setSolicitacoesLocais(dados);
-        if (dados.length >= 4) {
-          setUsarSimulacaoPreditiva(false);
-        }
       });
     }
   }, [solicitacoesProp]);
 
   // Define a base de dados ativa (Simulação com Inteligência Estatística ou Dados Reais)
   const dadosAtivos = useMemo(() => {
-    if (usarSimulacaoPreditiva || solicitacoesLocais.length === 0) {
+    if (usarSimulacaoPreditiva) {
       return gerarDadosSimuladosDesconto();
     }
     return solicitacoesLocais;

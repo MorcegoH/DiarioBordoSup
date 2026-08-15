@@ -9,6 +9,12 @@ import { SolicitacaoDesconto, TipoDesconto, BudgetState } from '../../types';
 import { HIERARQUIA_EQUIPES, BUDGET_LIMITS, validarPlacaVeiculo } from '../../data/discountData';
 import { sanitizeTextInput } from '../../utils/security';
 import { 
+  calcularDescontoAdesao, 
+  calcularDescontoPlano, 
+  formatarMoedaBRL, 
+  formatarPercentual 
+} from '../../utils/finance';
+import { 
   FileCheck, 
   User, 
   Users, 
@@ -74,50 +80,11 @@ export const DiscountRequestForm: React.FC<DiscountRequestFormProps> = React.mem
 
   // Cálculos Financeiros em Tempo Real
   const calculosFinanceiros = useMemo(() => {
-    let valorCheio = 0;
-    let descontoInput = 0;
-    let valorDescontoCalculado = 0;
-    let percentualDesconto = 0;
-    let valorFinal = 0;
-    let excedeTeto = false;
-    let mensagemErroTeto = '';
-
     if (tipoDesconto === 'Adesão') {
-      valorCheio = BUDGET_LIMITS.valorAdesaoPadrao; // R$ 200,00 fixo
-      descontoInput = parseFloat(descontoValorAdesao.replace(',', '.')) || 0;
-      valorDescontoCalculado = Math.max(0, Math.min(valorCheio, descontoInput));
-      percentualDesconto = valorCheio > 0 ? (valorDescontoCalculado / valorCheio) * 100 : 0;
-      valorFinal = Math.max(0, valorCheio - valorDescontoCalculado);
-
-      // Desconto em Adesão NÃO tem teto de 20% (pode ser até R$ 200,00 da adesão total)
-      if (descontoInput > valorCheio) {
-        excedeTeto = true;
-        mensagemErroTeto = `O desconto de Adesão não pode ultrapassar o valor total de R$ ${valorCheio.toFixed(2).replace('.', ',')}.`;
-      }
+      return calcularDescontoAdesao(descontoValorAdesao);
     } else {
-      // Plano Mensal: Possui teto máximo de 20%
-      valorCheio = parseFloat(valorCheioPlano.replace(',', '.')) || 0;
-      descontoInput = parseFloat(descontoPercentualPlano.replace(',', '.')) || 0;
-      percentualDesconto = Math.max(0, descontoInput);
-      valorDescontoCalculado = (valorCheio * percentualDesconto) / 100;
-      valorFinal = Math.max(0, valorCheio - valorDescontoCalculado);
-
-      // Teto exclusivo para Plano Mensal: 20%
-      if (percentualDesconto > BUDGET_LIMITS.tetoMaximoPercentualDesconto) {
-        excedeTeto = true;
-        mensagemErroTeto = `Teto máximo de 20% excedido no Plano Mensal! O percentual solicitado (${percentualDesconto.toFixed(1).replace('.', ',')}%) é superior ao limite permitido de 20,0%.`;
-      }
+      return calcularDescontoPlano(valorCheioPlano, descontoPercentualPlano);
     }
-
-    return {
-      valorCheio,
-      descontoInput,
-      valorDescontoCalculado,
-      percentualDesconto,
-      valorFinal,
-      excedeTeto,
-      mensagemErroTeto
-    };
   }, [tipoDesconto, valorCheioPlano, descontoValorAdesao, descontoPercentualPlano]);
 
   // Validação de Trava de Orçamento da Supervisora

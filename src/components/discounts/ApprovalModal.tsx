@@ -6,7 +6,7 @@
 
 import React, { useState } from 'react';
 import { SolicitacaoDesconto } from '../../types';
-import { verifyAdminAuthorization, verificarSenhaGerente } from '../../utils/security';
+import { verifyAdminAuthorization, verificarSenhaGerente, sanitizeTextInput } from '../../utils/security';
 import { ShieldCheck, Lock, CheckCircle2, AlertTriangle, X, Eye, EyeOff } from 'lucide-react';
 
 interface ApprovalModalProps {
@@ -42,12 +42,13 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = React.memo(({
       return;
     }
 
-    if (!parecer.trim()) {
+    const cleanParecer = sanitizeTextInput(parecer, 1500);
+    if (!cleanParecer.trim()) {
       alert('Por favor, informe o Parecer / Autorização escrito.');
       return;
     }
 
-    onConfirmAprovacao(solicitacao.id, parecer, 'Heder Santos (Gerente)');
+    onConfirmAprovacao(solicitacao.id, cleanParecer, 'Heder Santos (Gerente)');
     setSenhaInput('');
     setErroSenha(null);
     onClose();

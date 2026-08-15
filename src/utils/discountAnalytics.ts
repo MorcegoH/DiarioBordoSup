@@ -266,12 +266,14 @@ export function calcularBurnRate(solicitacoes: SolicitacaoDesconto[], mesAnoRef?
   const percentualConsumido = Math.min(100, Math.round((consumoAtual / tetoMaximo) * 100));
 
   let statusQueima: 'Sustentável' | 'Atenção' | 'Crítico (Esgotamento Precoce)' = 'Sustentável';
-  let mensagemExecutiva = `Ritmo controlado de R$ ${burnRateDiario.toFixed(2).replace('.', ',')}/dia. O saldo chegará ao fim do mês com folga orçamentária.`;
+  let mensagemExecutiva = consumoAtual === 0 
+    ? 'Orçamento integral de R$ 900,00 disponível. Nenhuma concessão de desconto realizada no período. Sistema pronto para operação.'
+    : `Ritmo controlado de R$ ${burnRateDiario.toFixed(2).replace('.', ',')}/dia. O saldo chegará ao fim do mês com folga orçamentária.`;
 
-  if (projecaoFinalMes > tetoMaximo * 1.15) {
+  if (projecaoFinalMes > tetoMaximo * 1.15 && consumoAtual > 0) {
     statusQueima = 'Crítico (Esgotamento Precoce)';
     mensagemExecutiva = `Alerta Crítico: No ritmo atual de R$ ${burnRateDiario.toFixed(2).replace('.', ',')}/dia, os R$ 900,00 vão acabar no Dia ${diaEstimadoEsgotamento || totalDiasMes}. Projeção de estouro de R$ ${(projecaoFinalMes - tetoMaximo).toFixed(2).replace('.', ',')}.`;
-  } else if (projecaoFinalMes > tetoMaximo) {
+  } else if (projecaoFinalMes > tetoMaximo && consumoAtual > 0) {
     statusQueima = 'Atenção';
     mensagemExecutiva = `Atenção: Consumo ligeiramente acima da média sustentável (R$ ${burnRateDiario.toFixed(2).replace('.', ',')}/dia vs meta de R$ ${ritmoIdealDiario.toFixed(2).replace('.', ',')}/dia). O saldo acabará próximo ao Dia ${diaEstimadoEsgotamento || totalDiasMes}.`;
   }
@@ -436,25 +438,27 @@ export function calcularRiscoSLA(solicitacoes: SolicitacaoDesconto[]): SLARiskAn
   });
 
   const countTotal = Math.max(1, avaliadas.length);
-  const mediaMin = avaliadas.length > 0 ? Math.round(somaMinutos / avaliadas.length) : 75; // fallback ~1h15m se vazio
+  const mediaMin = avaliadas.length > 0 ? Math.round(somaMinutos / avaliadas.length) : 0;
   const mediaHoras = Math.round((mediaMin / 60) * 10) / 10;
 
   const horasInt = Math.floor(mediaMin / 60);
   const minRest = mediaMin % 60;
-  const tempoMedioFormatado = `${horasInt}h ${String(minRest).padStart(2, '0')}m`;
+  const tempoMedioFormatado = avaliadas.length > 0 ? `${horasInt}h ${String(minRest).padStart(2, '0')}m` : '0h 00m';
 
   let statusSLA: 'Excelente' | 'Normal' | 'Alerta Amarelo (Próximo a 4h)' | 'Crítico (Estouro de SLA)' = 'Excelente';
   let corAlerta: 'verde' | 'amarelo' | 'vermelho' = 'verde';
 
-  if (mediaMin >= 240) {
-    statusSLA = 'Crítico (Estouro de SLA)';
-    corAlerta = 'vermelho';
-  } else if (mediaMin >= 180) { // a partir de 3h (próximo de 4h)
-    statusSLA = 'Alerta Amarelo (Próximo a 4h)';
-    corAlerta = 'amarelo';
-  } else if (mediaMin >= 120) {
-    statusSLA = 'Normal';
-    corAlerta = 'amarelo';
+  if (avaliadas.length > 0) {
+    if (mediaMin >= 240) {
+      statusSLA = 'Crítico (Estouro de SLA)';
+      corAlerta = 'vermelho';
+    } else if (mediaMin >= 180) { // a partir de 3h (próximo de 4h)
+      statusSLA = 'Alerta Amarelo (Próximo a 4h)';
+      corAlerta = 'amarelo';
+    } else if (mediaMin >= 120) {
+      statusSLA = 'Normal';
+      corAlerta = 'amarelo';
+    }
   }
 
   const percentualNoPrazo = avaliadas.length > 0 ? Math.round((totalNoPrazo / avaliadas.length) * 100) : 100;
@@ -510,8 +514,8 @@ export function calcularConversaoTipoDesconto(solicitacoes: SolicitacaoDesconto[
   });
 
   const totalGeral = gastoAdesao + gastoPlano;
-  const percAdesao = totalGeral > 0 ? Math.round((gastoAdesao / totalGeral) * 100) : 50;
-  const percPlano = totalGeral > 0 ? Math.round((gastoPlano / totalGeral) * 100) : 50;
+  const percAdesao = totalGeral > 0 ? Math.round((gastoAdesao / totalGeral) * 100) : 0;
+  const percPlano = totalGeral > 0 ? Math.round((gastoPlano / totalGeral) * 100) : 0;
 
   const ticketMedioAdesao = qtdAdesao > 0 ? Math.round((gastoAdesao / qtdAdesao) * 100) / 100 : 0;
   const ticketMedioPlano = qtdPlano > 0 ? Math.round((gastoPlano / qtdPlano) * 100) / 100 : 0;
@@ -519,20 +523,22 @@ export function calcularConversaoTipoDesconto(solicitacoes: SolicitacaoDesconto[
   const modalidadeMaisCritica: TipoDesconto = gastoAdesao >= gastoPlano ? 'Adesão' : 'Plano';
 
   let diagnosticoImpacto = '';
-  if (gastoAdesao > gastoPlano) {
+  if (totalGeral === 0) {
+    diagnosticoImpacto = 'Nenhuma concessão de desconto aprovada no período. O ambiente está 100% limpo e pronto para registrar as primeiras solicitações.';
+  } else if (gastoAdesao > gastoPlano) {
     diagnosticoImpacto = `A concessão de descontos em Adesão representa ${percAdesao}% do montante financeiro concedido (R$ ${gastoAdesao.toFixed(2).replace('.', ',')}). É a principal fonte de renúncia de receita imediata no caixa de entrada.`;
   } else {
     diagnosticoImpacto = `A concessão de descontos no Plano Mensal representa ${percPlano}% do impacto financeiro (R$ ${gastoPlano.toFixed(2).replace('.', ',')}). Atenção: Desconto em plano compromete a receita recorrente (MRR) ao longo de todo o ciclo de vida do cliente.`;
   }
 
   const dadosPizzaVolume = [
-    { name: 'Desconto Adesão', value: qtdAdesao || 1, color: '#005b2e' },
-    { name: 'Desconto Plano', value: qtdPlano || 1, color: '#0284c7' }
+    { name: 'Desconto Adesão', value: qtdAdesao, color: '#005b2e' },
+    { name: 'Desconto Plano', value: qtdPlano, color: '#0284c7' }
   ];
 
   const dadosPizzaFinanceiro = [
-    { name: 'Impacto Adesão (R$)', value: Math.round(gastoAdesao * 100) / 100 || 50, color: '#005b2e', percentual: percAdesao },
-    { name: 'Impacto Plano (R$)', value: Math.round(gastoPlano * 100) / 100 || 50, color: '#0284c7', percentual: percPlano }
+    { name: 'Impacto Adesão (R$)', value: Math.round(gastoAdesao * 100) / 100, color: '#005b2e', percentual: percAdesao },
+    { name: 'Impacto Plano (R$)', value: Math.round(gastoPlano * 100) / 100, color: '#0284c7', percentual: percPlano }
   ];
 
   return {

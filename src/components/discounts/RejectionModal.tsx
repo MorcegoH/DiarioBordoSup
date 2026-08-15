@@ -6,6 +6,7 @@
 
 import React, { useState } from 'react';
 import { SolicitacaoDesconto } from '../../types';
+import { sanitizeTextInput } from '../../utils/security';
 import { XCircle, AlertCircle, X } from 'lucide-react';
 
 interface RejectionModalProps {
@@ -28,12 +29,13 @@ export const RejectionModal: React.FC<RejectionModalProps> = React.memo(({
   const handleReprovar = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!parecer.trim()) {
+    const cleanParecer = sanitizeTextInput(parecer, 1500);
+    if (!cleanParecer.trim()) {
       alert('Por favor, informe o motivo da recusa / parecer do Gerente.');
       return;
     }
 
-    onConfirmReprovacao(solicitacao.id, parecer, 'Heder Santos (Gerente)');
+    onConfirmReprovacao(solicitacao.id, cleanParecer, 'Heder Santos (Gerente)');
     setParecer('');
     onClose();
   };

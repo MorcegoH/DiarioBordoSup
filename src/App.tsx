@@ -15,12 +15,11 @@ import { OccurrenceHistory } from './components/OccurrenceHistory';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { ShiftPassoverSection } from './components/ShiftPassoverSection';
 import { DiscountRequestsSection } from './components/DiscountRequestsSection';
-import { exportToCSV } from './utils/statisticalAnalysis';
-
-import { verifyAdminAuthorization } from './utils/security';
+import { exportToCSV, exportPassagensToCSV } from './utils/statisticalAnalysis';
+import { exportarDescontosCSV } from './data/discountData';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'ocorrencias' | 'dashboard' | 'passagem' | 'descontos'>('descontos');
+  const [activeTab, setActiveTab] = useState<'ocorrencias' | 'dashboard' | 'passagem' | 'descontos'>('ocorrencias');
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>(INITIAL_MOCK_OCORRENCIAS);
   const [passagens, setPassagens] = useState<ResumoPassagem[]>(INITIAL_MOCK_PASSAGENS);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -130,26 +129,18 @@ export default function App() {
     return await dbService.addComentarioPassagem(passagemId, comentario);
   }, []);
 
-  const handleResetData = useCallback(async () => {
-    const senhaInput = window.prompt('Confirmação de Segurança: Informe a senha de autorização para zerar o banco de dados e registros:');
-    if (verifyAdminAuthorization(senhaInput)) {
-      if (window.confirm('Tem certeza absoluta que deseja zerar todos os registros do sistema (Banco Supabase e LocalStorage)?')) {
-        setOcorrencias([]);
-        setPassagens([]);
-        await Promise.all([
-          dbService.clearAllData(),
-          discountService.clearAllData()
-        ]);
-        alert('Todos os dados foram zerados com sucesso.');
-      }
-    } else if (senhaInput !== null) {
-      alert('Senha incorreta! Ação de exclusão/limpeza não autorizada.');
-    }
-  }, []);
-
+  // ARQUITETURA REFATORADA: Exportação Inteligente de CSV Contextual baseada na aba ativa
   const handleExportCSV = useCallback(() => {
-    exportToCSV(ocorrencias);
-  }, [ocorrencias]);
+    if (activeTab === 'descontos') {
+      const descontos = discountService.getSolicitacoes();
+      exportarDescontosCSV(descontos);
+    } else if (activeTab === 'passagem') {
+      exportPassagensToCSV(passagens);
+    } else {
+      // 'ocorrencias' ou 'dashboard'
+      exportToCSV(ocorrencias);
+    }
+  }, [activeTab, ocorrencias, passagens]);
 
   const totalCriticos = useMemo(() => {
     let count = 0;
@@ -172,7 +163,6 @@ export default function App() {
         totalCriticos={totalCriticos}
         ocorrencias={ocorrencias}
         passagens={passagens}
-        onResetData={handleResetData}
         onExportCSV={handleExportCSV}
         onDataSynced={loadInitialData}
       />

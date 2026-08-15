@@ -7,7 +7,12 @@
 import React, { useState, useMemo } from 'react';
 import { SolicitacaoDesconto, TipoDesconto, BudgetCycleInfo } from '../../types';
 import { HIERARQUIA_EQUIPES, validarPlacaVeiculo } from '../../data/discountData';
-import { verificarSenhaGerente } from '../../utils/security';
+import { verificarSenhaGerente, sanitizeTextInput } from '../../utils/security';
+import { 
+  calcularDescontoAdesao, 
+  calcularDescontoPlano, 
+  formatarMoedaBRL 
+} from '../../utils/finance';
 import { 
   Shield, 
   Lock, 
@@ -85,49 +90,21 @@ export const ManagerDirectReleaseModal: React.FC<ManagerDirectReleaseModalProps>
 
   // Cálculos financeiros em tempo real
   const calculos = useMemo(() => {
-    let valorCheio = 0;
-    let valorDesconto = 0;
-    let percentual = 0;
-    let valorFinal = 0;
-    let excede = false;
-    let mensagemErro = '';
-
-    if (tipoDesconto === 'Adesão') {
-      valorCheio = 200.0;
-      const descInput = parseFloat(descontoValorAdesao.replace(',', '.')) || 0;
-      valorDesconto = Math.max(0, descInput);
-      percentual = valorCheio > 0 ? (valorDesconto / valorCheio) * 100 : 0;
-      valorFinal = Math.max(0, valorCheio - valorDesconto);
-
-      if (valorDesconto > valorCheio) {
-        excede = true;
-        mensagemErro = `O valor do desconto em Adesão não pode ultrapassar R$ 200,00.`;
-      }
-    } else {
-      // Plano Mensal
-      valorCheio = parseFloat(valorCheioPlano.replace(',', '.')) || 0;
-      const percInput = parseFloat(descontoPercentualPlano.replace(',', '.')) || 0;
-      percentual = Math.max(0, percInput);
-      valorDesconto = (valorCheio * percentual) / 100;
-      valorFinal = Math.max(0, valorCheio - valorDesconto);
-
-      if (percentual > 20.0) {
-        excede = true;
-        mensagemErro = `O desconto do Plano Mensal não pode ultrapassar o teto de 20,0% (${percentual.toFixed(1).replace('.', ',')}% informado).`;
-      }
-    }
+    const res = tipoDesconto === 'Adesão'
+      ? calcularDescontoAdesao(descontoValorAdesao)
+      : calcularDescontoPlano(valorCheioPlano, descontoPercentualPlano);
 
     // Validação da Reserva do Gerente
     const tetoGerenteEsgotado = saldoReservaGerente <= 0;
-    const excedeSaldoGerente = valorDesconto > saldoReservaGerente;
+    const excedeSaldoGerente = res.valorDescontoCalculado > saldoReservaGerente;
 
     return {
-      valorCheio,
-      valorDesconto,
-      percentual,
-      valorFinal,
-      excede,
-      mensagemErro,
+      valorCheio: res.valorCheio,
+      valorDesconto: res.valorDescontoCalculado,
+      percentual: res.percentualDesconto,
+      valorFinal: res.valorFinal,
+      excede: res.excedeTeto,
+      mensagemErro: res.mensagemErroTeto,
       tetoGerenteEsgotado,
       excedeSaldoGerente
     };
@@ -195,10 +172,13 @@ export const ManagerDirectReleaseModal: React.FC<ManagerDirectReleaseModalProps>
     const agora = new Date().toISOString();
     const id = `ger-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
+    const cleanCliente = sanitizeTextInput(cliente, 150);
+    const cleanMotivo = sanitizeTextInput(motivoLiberacao, 1000);
+
     const novaLiberacao: SolicitacaoDesconto = {
       id,
       dataHoraSolicitacao: agora,
-      cliente: cliente.trim(),
+      cliente: cleanCliente,
       supervisora: supervisora,
       consultor: consultor,
       placa: validacaoPlaca.formatada,
@@ -208,11 +188,11 @@ export const ManagerDirectReleaseModal: React.FC<ManagerDirectReleaseModalProps>
       valorDescontoCalculado: calculos.valorDesconto,
       percentualDesconto: calculos.percentual,
       valorFinal: calculos.valorFinal,
-      justificativa: `[LIBERAÇÃO DIRETA GERENCIAL]: ${motivoLiberacao.trim()}`,
+      justificativa: `[LIBERAÇÃO DIRETA GERENCIAL]: ${cleanMotivo}`,
       status: 'Aprovado',
       dataHoraAprovacao: agora,
       aprovador: 'Heder Santos (Gerente)',
-      parecer: `Liberação direta autorizada pelo Gerente de Vendas: ${motivoLiberacao.trim()}`,
+      parecer: `Liberação direta autorizada pelo Gerente de Vendas: ${cleanMotivo}`,
       tipoRegistro: 'LiberacaoGerencial'
     };
 
