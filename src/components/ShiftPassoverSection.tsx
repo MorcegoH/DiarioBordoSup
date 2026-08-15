@@ -801,7 +801,7 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
                       onClick={() => handleAbrirDetalhes(
                         'Tabulação: Solução / Conclusão Aplicada',
                         'solucao',
-                        p.observacaoConclusao || 'Pendência marcada como concluída sem detalhes adicionais.',
+                        p.observacaoConclusao || 'Conclusão registrada com sucesso.',
                         p
                       )}
                       className="bg-emerald-100/50 hover:bg-emerald-100/80 p-3 rounded-lg border border-emerald-300 text-emerald-950 mb-3 cursor-pointer transition-all group"
@@ -822,9 +822,11 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
                           Ver Tabulação
                         </span>
                       </div>
-                      <p className="whitespace-pre-wrap text-emerald-950 line-clamp-2 italic">
-                        "{p.observacaoConclusao || 'Concluído diretamente pelo supervisor.'}"
-                      </p>
+                      {p.observacaoConclusao ? (
+                        <p className="whitespace-pre-wrap text-emerald-950 line-clamp-2 italic">
+                          "{p.observacaoConclusao}"
+                        </p>
+                      ) : null}
                     </div>
                   )}
 
