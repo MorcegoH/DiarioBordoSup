@@ -69,15 +69,31 @@ function mapOcorrenciaToDB(item: Ocorrencia) {
 }
 
 function mapPassagemFromDB(row: any): ResumoPassagem {
+  const conteudoObj = typeof row.conteudo === 'object' && row.conteudo !== null ? row.conteudo : {};
   return {
     id: String(row.id || ''),
     data: row.data || '',
     supervisor: sanitizeTextInput(row.supervisor || '', 100),
-    oQueFuncionou: sanitizeTextInput(row.o_que_funcionou || row.o_que_funcionou_hoje || '', 3000),
-    oQueFicaPendente: sanitizeTextInput(row.o_que_fica_pendente || row.o_que_fica_pendente_amanha || row.pendencias || '', 3000),
-    dataHoraCriacao: row.data_hora_criacao || row.created_at || new Date().toISOString(),
-    dataHoraConclusao: row.data_hora_conclusao || undefined,
-    status: row.status || (row.data_hora_conclusao ? 'Concluído' : 'Pendente')
+    oQueFuncionou: sanitizeTextInput(
+      row.o_que_funcionou || 
+      row.oQueFuncionou || 
+      conteudoObj.oQueFuncionou || 
+      conteudoObj.o_que_funcionou || 
+      row.o_que_funcionou_hoje || '', 
+      3000
+    ),
+    oQueFicaPendente: sanitizeTextInput(
+      row.o_que_fica_pendente || 
+      row.oQueFicaPendente || 
+      conteudoObj.oQueFicaPendente || 
+      conteudoObj.o_que_fica_pendente || 
+      row.o_que_fica_pendente_amanha || 
+      row.pendencias || '', 
+      3000
+    ),
+    dataHoraCriacao: row.data_hora_criacao || row.dataHoraCriacao || conteudoObj.dataHoraCriacao || row.created_at || new Date().toISOString(),
+    dataHoraConclusao: row.data_hora_conclusao || row.dataHoraConclusao || conteudoObj.dataHoraConclusao || undefined,
+    status: row.status || (row.data_hora_conclusao || row.dataHoraConclusao || conteudoObj.status === 'Concluído' ? 'Concluído' : 'Pendente')
   };
 }
 
@@ -86,6 +102,13 @@ function mapPassagemToDB(item: ResumoPassagem) {
     id: item.id,
     data: item.data,
     supervisor: item.supervisor,
+    conteudo: {
+      oQueFuncionou: item.oQueFuncionou,
+      oQueFicaPendente: item.oQueFicaPendente,
+      dataHoraCriacao: item.dataHoraCriacao,
+      dataHoraConclusao: item.dataHoraConclusao || null,
+      status: item.status || (item.dataHoraConclusao ? 'Concluído' : 'Pendente')
+    },
     o_que_funcionou: item.oQueFuncionou,
     o_que_fica_pendente: item.oQueFicaPendente,
     data_hora_criacao: item.dataHoraCriacao,
@@ -578,8 +601,8 @@ export const dbService = {
       // 2. Se der erro de coluna ausente no schema cache (PGRST204 ou código 42703)
       if (error && (error.code === '42703' || error.code === 'PGRST204' || error.message?.includes('column') || error.message?.includes('schema cache'))) {
         
-        // Tentativa A: camelCase (comum quando a tabela foi criada via interface visual)
-        const payloadCamelCase = {
+        // Tentativa A1: camelCase completo
+        const payloadCamelCaseCompleto = {
           id: nova.id,
           data: nova.data,
           supervisor: nova.supervisor,
@@ -589,8 +612,22 @@ export const dbService = {
           dataHoraConclusao: nova.dataHoraConclusao || null,
           status: nova.status || 'Pendente'
         };
-        const retryA = await supabase.from('resumos_passagem').insert([payloadCamelCase]);
-        if (!retryA.error) {
+        const retryA1 = await supabase.from('resumos_passagem').insert([payloadCamelCaseCompleto]);
+        if (!retryA1.error) {
+          return { success: true, storage: 'supabase' };
+        }
+
+        // Tentativa A2: camelCase Clássico (exatamente as colunas da tabela criada no Supabase sem dataHoraConclusao)
+        const payloadCamelCaseClassico = {
+          id: nova.id,
+          data: nova.data,
+          supervisor: nova.supervisor,
+          oQueFuncionou: nova.oQueFuncionou,
+          oQueFicaPendente: nova.oQueFicaPendente,
+          dataHoraCriacao: nova.dataHoraCriacao
+        };
+        const retryA2 = await supabase.from('resumos_passagem').insert([payloadCamelCaseClassico]);
+        if (!retryA2.error) {
           return { success: true, storage: 'supabase' };
         }
 
@@ -608,14 +645,14 @@ export const dbService = {
           return { success: true, storage: 'supabase' };
         }
 
-        // Tentativa C: Apenas colunas base mínimas
+        // Tentativa C: snake_case clássico sem as colunas novas
         const { data_hora_conclusao, status, ...payloadBase } = payloadPadrao;
         const retryC = await supabase.from('resumos_passagem').insert([payloadBase]);
         if (!retryC.error) {
           return { success: true, storage: 'supabase' };
         }
 
-        error = retryA.error || retryB.error || retryC.error || error;
+        error = retryA2.error || retryA1.error || retryB.error || retryC.error || error;
       }
 
       if (error) {
@@ -648,12 +685,16 @@ export const dbService = {
     }
 
     try {
-      const payload: any = mapPassagemToDB(item);
-      let { error } = await supabase.from('resumos_passagem').update(payload).eq('id', item.id);
+      const payloadPadrao: any = mapPassagemToDB(item);
+      let { error } = await supabase.from('resumos_passagem').update(payloadPadrao).eq('id', item.id);
 
-      if (error && (error.code === '42703' || error.message?.includes('column'))) {
-        const { data_hora_conclusao, status, ...payloadLegado } = payload;
-        const retry = await supabase.from('resumos_passagem').update(payloadLegado).eq('id', item.id);
+      if (error && (error.code === '42703' || error.code === 'PGRST204' || error.message?.includes('column'))) {
+        const payloadCamelCase: any = {
+          supervisor: item.supervisor,
+          oQueFuncionou: item.oQueFuncionou,
+          oQueFicaPendente: item.oQueFicaPendente
+        };
+        const retry = await supabase.from('resumos_passagem').update(payloadCamelCase).eq('id', item.id);
         error = retry.error;
       }
 
@@ -694,7 +735,7 @@ export const dbService = {
       const payload: any = mapPassagemToDB(updatedItem);
       let { error } = await supabase.from('resumos_passagem').update(payload).eq('id', id);
 
-      if (error && (error.code === '42703' || error.message?.includes('column'))) {
+      if (error && (error.code === '42703' || error.code === 'PGRST204' || error.message?.includes('column'))) {
         const { data_hora_conclusao, status, ...payloadLegado } = payload;
         const retry = await supabase.from('resumos_passagem').update(payloadLegado).eq('id', id);
         error = retry.error;
