@@ -5,14 +5,14 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, BarChart3, ClipboardList, RefreshCw, Sparkles, Clock, Download, Database, CheckCircle2, ServerOff } from 'lucide-react';
+import { ShieldCheck, BarChart3, ClipboardList, RefreshCw, Sparkles, Clock, Download, Database, CheckCircle2, ServerOff, BadgePercent } from 'lucide-react';
 import { dbService, DbHealthStatus } from '../services/dbService';
 import { DatabaseErrorModal } from './DatabaseErrorModal';
 import { Ocorrencia, ResumoPassagem } from '../types';
 
 interface HeaderProps {
-  activeTab: 'ocorrencias' | 'dashboard' | 'passagem';
-  setActiveTab: (tab: 'ocorrencias' | 'dashboard' | 'passagem') => void;
+  activeTab: 'ocorrencias' | 'dashboard' | 'passagem' | 'descontos';
+  setActiveTab: (tab: 'ocorrencias' | 'dashboard' | 'passagem' | 'descontos') => void;
   totalOcorrencias: number;
   totalCriticos: number;
   ocorrencias: Ocorrencia[];
@@ -197,7 +197,7 @@ export const Header: React.FC<HeaderProps> = React.memo(({
         <nav className="flex overflow-x-auto space-x-1 sm:space-x-2 mt-5 pt-2 border-t border-emerald-700/60 no-scrollbar">
           <button
             onClick={() => setActiveTab('ocorrencias')}
-            className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-lg transition-all whitespace-nowrap ${
+            className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-lg transition-all whitespace-nowrap cursor-pointer ${
               activeTab === 'ocorrencias'
                 ? 'bg-white text-[#005b2e] shadow-sm font-semibold'
                 : 'text-emerald-100 hover:bg-emerald-800/60 hover:text-white'
@@ -208,8 +208,20 @@ export const Header: React.FC<HeaderProps> = React.memo(({
           </button>
 
           <button
+            onClick={() => setActiveTab('descontos')}
+            className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-lg transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === 'descontos'
+                ? 'bg-white text-[#005b2e] shadow-sm font-semibold'
+                : 'text-emerald-100 hover:bg-emerald-800/60 hover:text-white'
+            }`}
+          >
+            <BadgePercent className="w-4 h-4" />
+            <span>Solicitações de Desconto</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('dashboard')}
-            className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-lg transition-all whitespace-nowrap ${
+            className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-lg transition-all whitespace-nowrap cursor-pointer ${
               activeTab === 'dashboard'
                 ? 'bg-white text-[#005b2e] shadow-sm font-semibold'
                 : 'text-emerald-100 hover:bg-emerald-800/60 hover:text-white'
@@ -221,7 +233,7 @@ export const Header: React.FC<HeaderProps> = React.memo(({
 
           <button
             onClick={() => setActiveTab('passagem')}
-            className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-lg transition-all whitespace-nowrap ${
+            className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-lg transition-all whitespace-nowrap cursor-pointer ${
               activeTab === 'passagem'
                 ? 'bg-white text-[#005b2e] shadow-sm font-semibold'
                 : 'text-emerald-100 hover:bg-emerald-800/60 hover:text-white'

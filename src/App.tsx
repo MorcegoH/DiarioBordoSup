@@ -13,12 +13,13 @@ import { OccurrenceForm } from './components/OccurrenceForm';
 import { OccurrenceHistory } from './components/OccurrenceHistory';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { ShiftPassoverSection } from './components/ShiftPassoverSection';
+import { DiscountRequestsSection } from './components/DiscountRequestsSection';
 import { exportToCSV } from './utils/statisticalAnalysis';
 
 import { verifyAdminAuthorization } from './utils/security';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'ocorrencias' | 'dashboard' | 'passagem'>('ocorrencias');
+  const [activeTab, setActiveTab] = useState<'ocorrencias' | 'dashboard' | 'passagem' | 'descontos'>('descontos');
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>(INITIAL_MOCK_OCORRENCIAS);
   const [passagens, setPassagens] = useState<ResumoPassagem[]>(INITIAL_MOCK_PASSAGENS);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -191,12 +192,17 @@ export default function App() {
           </div>
         )}
 
-        {/* Guia 2: Dashboard BI & Z-Score Anomaly Engine */}
+        {/* Guia 2: Solicitações de Desconto & Governança de Inside Sales */}
+        {activeTab === 'descontos' && (
+          <DiscountRequestsSection />
+        )}
+
+        {/* Guia 3: Dashboard BI & Z-Score Anomaly Engine */}
         {activeTab === 'dashboard' && (
           <AnalyticsDashboard ocorrencias={ocorrencias} />
         )}
 
-        {/* Guia 3: SEÇÃO 4: Passagem de Bastão */}
+        {/* Guia 4: SEÇÃO 4: Passagem de Bastão */}
         {activeTab === 'passagem' && (
           <ShiftPassoverSection
             ocorrencias={ocorrencias}

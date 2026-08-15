@@ -99,3 +99,69 @@ export interface FiltrosOcorrencia {
   dataInicio?: string;
   dataFim?: string;
 }
+
+/**
+ * =====================================================================
+ * TIPOS PARA A ABA: SOLICITAÇÕES DE DESCONTO & GOVERNANÇA FINANCEIRA
+ * =====================================================================
+ */
+
+export type TipoDesconto = 'Adesão' | 'Plano';
+
+export type StatusDesconto = 'Aguardando Aprovação' | 'Aprovado' | 'Negado';
+
+export interface SolicitacaoDesconto {
+  id: string;
+  dataHoraSolicitacao: string; // ISO string
+  cliente: string;
+  supervisora: 'Débora Rodrigues' | 'Marília Farias' | 'Gerência (Heder Santos)' | string;
+  consultor: string;
+  placa: string;
+  tipoDesconto: TipoDesconto;
+  valorCheio: number; // R$ 200,00 se Adesão, ou valor digitado se Plano
+  descontoInput: number; // R$ se Adesão, % se Plano
+  valorDescontoCalculado: number; // Em R$ efetivo
+  percentualDesconto: number; // % efetivo (máx 20% no plano)
+  valorFinal: number; // valorCheio - valorDescontoCalculado
+  justificativa: string;
+  status: StatusDesconto;
+  dataHoraAprovacao?: string;
+  parecer?: string;
+  aprovador?: string;
+  tipoRegistro?: 'SolicitacaoSupervisao' | 'LiberacaoGerencial';
+}
+
+export interface BudgetSupervisor {
+  tetoMensal: number;
+  totalUtilizado: number;
+  saldoDisponivel: number;
+  totalPendente: number;
+}
+
+export interface BudgetManager {
+  tetoMensal: number;
+  totalUtilizado: number;
+  saldoDisponivel: number;
+}
+
+export interface BudgetCycleInfo {
+  mesAno: string; // formato "YYYY-MM", ex: "2026-08"
+  mesExtenso: string; // ex: "Agosto de 2026"
+  mesCurto: string; // ex: "Ago/2026"
+  periodoInicio: string; // ex: "01/08/2026"
+  periodoFim: string; // ex: "31/08/2026"
+  dataConsulta: string; // ex: "15/08/2026"
+  diasRestantesParaRenovacao: number;
+  dataProximaRenovacao: string; // ex: "01/09/2026"
+  isMesAtual: boolean;
+}
+
+export interface BudgetState {
+  tetoTotalDepartamento: number; // R$ 900,00
+  reservaGerente: number; // R$ 100,00
+  gerente?: BudgetManager;
+  debora: BudgetSupervisor; // R$ 400,00 base
+  marilia: BudgetSupervisor; // R$ 400,00 base
+  ciclo: BudgetCycleInfo;
+}
+
