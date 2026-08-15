@@ -43,21 +43,30 @@ CREATE TABLE public.ocorrencias (
 ALTER TABLE public.ocorrencias ADD COLUMN IF NOT EXISTS historico_atualizacoes JSONB DEFAULT '[]'::jsonb;
 
 -- 3. CRIAR TABELA DE PASSAGEM DE BASTÃO / FECHAMENTO
-CREATE TABLE public.resumos_passagem (
+CREATE TABLE IF NOT EXISTS public.resumos_passagem (
   id TEXT PRIMARY KEY,
   data TEXT NOT NULL,
   supervisor TEXT NOT NULL,
-  o_que_funcionou TEXT NOT NULL,
-  o_que_fica_pendente TEXT NOT NULL,
+  conteudo JSONB DEFAULT '{}'::jsonb,
+  o_que_funcionou TEXT,
+  o_que_fica_pendente TEXT,
   data_hora_criacao TIMESTAMPTZ NOT NULL,
   data_hora_conclusao TIMESTAMPTZ,
-  status TEXT DEFAULT 'Pendente'
+  status TEXT DEFAULT 'Pendente',
+  observacao_conclusao TEXT,
+  responsavel_conclusao TEXT,
+  comentarios JSONB DEFAULT '[]'::jsonb
 );
 
 -- Adicionar colunas se tabela já foi criada anteriormente
+ALTER TABLE public.resumos_passagem ADD COLUMN IF NOT EXISTS conteudo JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.resumos_passagem ADD COLUMN IF NOT EXISTS o_que_funcionou TEXT;
 ALTER TABLE public.resumos_passagem ADD COLUMN IF NOT EXISTS o_que_fica_pendente TEXT;
 ALTER TABLE public.resumos_passagem ADD COLUMN IF NOT EXISTS data_hora_conclusao TIMESTAMPTZ;
 ALTER TABLE public.resumos_passagem ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'Pendente';
+ALTER TABLE public.resumos_passagem ADD COLUMN IF NOT EXISTS observacao_conclusao TEXT;
+ALTER TABLE public.resumos_passagem ADD COLUMN IF NOT EXISTS responsavel_conclusao TEXT;
+ALTER TABLE public.resumos_passagem ADD COLUMN IF NOT EXISTS comentarios JSONB DEFAULT '[]'::jsonb;
 
 -- 4. ATIVAR ROW LEVEL SECURITY (RLS) PARA SEGURANÇA
 ALTER TABLE public.ocorrencias ENABLE ROW LEVEL SECURITY;

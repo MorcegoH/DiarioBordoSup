@@ -5,7 +5,7 @@
  */
 
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { Ocorrencia, ResumoPassagem, Status } from '../types';
+import { Ocorrencia, ResumoPassagem, Status, ComentarioPassagem } from '../types';
 import { sanitizeTextInput } from '../utils/security';
 
 const LOCAL_KEY_OCORRENCIAS = 'diario_bordo_ocorrencias_v1';
@@ -70,6 +70,20 @@ function mapOcorrenciaToDB(item: Ocorrencia) {
 
 function mapPassagemFromDB(row: any): ResumoPassagem {
   const conteudoObj = typeof row.conteudo === 'object' && row.conteudo !== null ? row.conteudo : {};
+  
+  const rawComentarios = Array.isArray(row.comentarios) 
+    ? row.comentarios 
+    : (Array.isArray(conteudoObj.comentarios) ? conteudoObj.comentarios : []);
+
+  const comentarios: ComentarioPassagem[] = rawComentarios.map((c: any) => ({
+    id: String(c.id || 'com-' + Math.random().toString(36).substr(2, 9)),
+    autor: sanitizeTextInput(c.autor || 'Líder', 100),
+    contexto: c.contexto === 'funcionou' || c.contexto === 'pendente' ? c.contexto : 'geral',
+    tipo: c.tipo === 'auxilio' || c.tipo === 'reconhecimento' ? c.tipo : 'alinhamento',
+    mensagem: sanitizeTextInput(c.mensagem || '', 3000),
+    dataHora: c.dataHora || c.data_hora || new Date().toISOString()
+  }));
+
   return {
     id: String(row.id || ''),
     data: row.data || '',
@@ -93,11 +107,30 @@ function mapPassagemFromDB(row: any): ResumoPassagem {
     ),
     dataHoraCriacao: row.data_hora_criacao || row.dataHoraCriacao || conteudoObj.dataHoraCriacao || row.created_at || new Date().toISOString(),
     dataHoraConclusao: row.data_hora_conclusao || row.dataHoraConclusao || conteudoObj.dataHoraConclusao || undefined,
-    status: row.status || (row.data_hora_conclusao || row.dataHoraConclusao || conteudoObj.status === 'Concluído' ? 'Concluído' : 'Pendente')
+    status: row.status || (row.data_hora_conclusao || row.dataHoraConclusao || conteudoObj.status === 'Concluído' ? 'Concluído' : 'Pendente'),
+    observacaoConclusao: sanitizeTextInput(
+      row.observacao_conclusao || 
+      row.observacaoConclusao || 
+      row.solucao_aplicada || 
+      conteudoObj.observacaoConclusao || 
+      conteudoObj.observacao_conclusao || 
+      conteudoObj.solucao_aplicada || '', 
+      3000
+    ),
+    responsavelConclusao: sanitizeTextInput(
+      row.responsavel_conclusao || 
+      row.responsavelConclusao || 
+      conteudoObj.responsavelConclusao || 
+      conteudoObj.responsavel_conclusao || '', 
+      100
+    ),
+    comentarios
   };
 }
 
 function mapPassagemToDB(item: ResumoPassagem) {
+  const comentariosList = item.comentarios || [];
+
   return {
     id: item.id,
     data: item.data,
@@ -107,13 +140,19 @@ function mapPassagemToDB(item: ResumoPassagem) {
       oQueFicaPendente: item.oQueFicaPendente,
       dataHoraCriacao: item.dataHoraCriacao,
       dataHoraConclusao: item.dataHoraConclusao || null,
-      status: item.status || (item.dataHoraConclusao ? 'Concluído' : 'Pendente')
+      status: item.status || (item.dataHoraConclusao ? 'Concluído' : 'Pendente'),
+      observacaoConclusao: item.observacaoConclusao || null,
+      responsavelConclusao: item.responsavelConclusao || null,
+      comentarios: comentariosList
     },
     o_que_funcionou: item.oQueFuncionou,
     o_que_fica_pendente: item.oQueFicaPendente,
     data_hora_criacao: item.dataHoraCriacao,
     data_hora_conclusao: item.dataHoraConclusao || null,
-    status: item.status || (item.dataHoraConclusao ? 'Concluído' : 'Pendente')
+    status: item.status || (item.dataHoraConclusao ? 'Concluído' : 'Pendente'),
+    observacao_conclusao: item.observacaoConclusao || null,
+    responsavel_conclusao: item.responsavelConclusao || null,
+    comentarios: comentariosList
   };
 }
 
@@ -708,7 +747,13 @@ export const dbService = {
     }
   },
 
-  async updateStatusPassagem(id: string, newStatus: 'Pendente' | 'Concluído', dataHoraConclusao?: string): Promise<DbOperationResult> {
+  async updateStatusPassagem(
+    id: string, 
+    newStatus: 'Pendente' | 'Concluído', 
+    dataHoraConclusao?: string,
+    observacaoConclusao?: string,
+    responsavelConclusao?: string
+  ): Promise<DbOperationResult> {
     const local = getLocalPassagens();
     let updatedItem: ResumoPassagem | undefined;
 
@@ -719,7 +764,9 @@ export const dbService = {
         updatedItem = {
           ...p,
           status: newStatus,
-          dataHoraConclusao: conclDate
+          dataHoraConclusao: conclDate,
+          observacaoConclusao: isConcluido ? (observacaoConclusao || p.observacaoConclusao) : undefined,
+          responsavelConclusao: isConcluido ? (responsavelConclusao || p.responsavelConclusao) : undefined
         };
         return updatedItem;
       }
@@ -735,10 +782,17 @@ export const dbService = {
       const payload: any = mapPassagemToDB(updatedItem);
       let { error } = await supabase.from('resumos_passagem').update(payload).eq('id', id);
 
+      // Fallback gracioso se as colunas novas não existirem como colunas de primeiro nível (já que o campo conteudo JSONB guarda tudo)
       if (error && (error.code === '42703' || error.code === 'PGRST204' || error.message?.includes('column'))) {
-        const { data_hora_conclusao, status, ...payloadLegado } = payload;
-        const retry = await supabase.from('resumos_passagem').update(payloadLegado).eq('id', id);
-        error = retry.error;
+        const { observacao_conclusao, responsavel_conclusao, ...payloadSemNovasColunas } = payload;
+        const retry1 = await supabase.from('resumos_passagem').update(payloadSemNovasColunas).eq('id', id);
+        if (!retry1.error) {
+          return { success: true, storage: 'supabase' };
+        }
+
+        const { data_hora_conclusao, status, ...payloadLegado } = payloadSemNovasColunas;
+        const retry2 = await supabase.from('resumos_passagem').update(payloadLegado).eq('id', id);
+        error = retry2.error;
       }
 
       if (error) {
@@ -766,6 +820,51 @@ export const dbService = {
         console.error('Erro ao excluir passagem no Supabase:', error);
         return { success: false, storage: 'local', errorCode: error.code, error: error.message };
       }
+      return { success: true, storage: 'supabase' };
+    } catch (err: any) {
+      return { success: false, storage: 'local', error: err?.message };
+    }
+  },
+
+  async addComentarioPassagem(passagemId: string, comentario: ComentarioPassagem): Promise<DbOperationResult> {
+    const local = getLocalPassagens();
+    let updatedItem: ResumoPassagem | undefined;
+
+    const atualizado = local.map((p) => {
+      if (p.id === passagemId) {
+        const novosComentarios = [...(p.comentarios || []), comentario];
+        updatedItem = {
+          ...p,
+          comentarios: novosComentarios
+        };
+        return updatedItem;
+      }
+      return p;
+    });
+
+    setLocalPassagens(atualizado);
+
+    if (!isSupabaseConfigured || !supabase || !updatedItem) {
+      return { success: true, storage: 'local' };
+    }
+
+    try {
+      const payload: any = mapPassagemToDB(updatedItem);
+      let { error } = await supabase.from('resumos_passagem').update(payload).eq('id', passagemId);
+
+      if (error && (error.code === '42703' || error.code === 'PGRST204' || error.message?.includes('column'))) {
+        // Fallback: tentar atualizar com o campo conteudo (jsonb) que guarda tudo
+        const retry = await supabase.from('resumos_passagem').update({
+          conteudo: payload.conteudo
+        }).eq('id', passagemId);
+        error = retry.error;
+      }
+
+      if (error) {
+        console.error('Erro ao salvar comentário da passagem no Supabase:', error);
+        return { success: false, storage: 'local', errorCode: error.code, error: error.message };
+      }
+
       return { success: true, storage: 'supabase' };
     } catch (err: any) {
       return { success: false, storage: 'local', error: err?.message };

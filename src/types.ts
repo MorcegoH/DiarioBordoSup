@@ -45,6 +45,18 @@ export interface Ocorrencia {
 }
 
 /**
+ * Representa um comentário ou apontamento de auxílio feito por um líder no fechamento de turno.
+ */
+export interface ComentarioPassagem {
+  id: string;
+  autor: string; // Nome do líder/supervisor
+  contexto: 'funcionou' | 'pendente' | 'geral'; // Se o comentário é sobre o que funcionou ou auxílio na pendência
+  tipo: 'auxilio' | 'reconhecimento' | 'alinhamento'; // Tipo do apontamento
+  mensagem: string; // Texto do comentário/auxílio
+  dataHora: string; // ISO string do comentário
+}
+
+/**
  * Representa o registro de Fechamento de Turno / Resumo Diário e Pendências.
  */
 export interface ResumoPassagem {
@@ -56,6 +68,9 @@ export interface ResumoPassagem {
   dataHoraCriacao: string; // ISO string de criação do registro
   dataHoraConclusao?: string; // ISO string de conclusão da pendência
   status?: 'Pendente' | 'Concluído';
+  observacaoConclusao?: string; // Tabulação / Explicação da solução aplicada na conclusão
+  responsavelConclusao?: string; // Supervisor ou responsável que concluiu a pendência
+  comentarios?: ComentarioPassagem[]; // Lista de comentários e auxílios de outros líderes
 }
 
 /**

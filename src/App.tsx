@@ -88,18 +88,44 @@ export default function App() {
     return await dbService.updatePassagem(updated);
   }, []);
 
-  const handleUpdatePassagemStatus = useCallback(async (id: string, newStatus: 'Pendente' | 'Concluído') => {
+  const handleUpdatePassagemStatus = useCallback(async (
+    id: string, 
+    newStatus: 'Pendente' | 'Concluído',
+    observacaoConclusao?: string,
+    responsavelConclusao?: string
+  ) => {
     const isConcluido = newStatus === 'Concluído';
     const conclDate = isConcluido ? new Date().toISOString() : undefined;
     setPassagens((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, status: newStatus, dataHoraConclusao: conclDate } : p))
+      prev.map((p) => (p.id === id ? { 
+        ...p, 
+        status: newStatus, 
+        dataHoraConclusao: conclDate,
+        observacaoConclusao: isConcluido ? observacaoConclusao : undefined,
+        responsavelConclusao: isConcluido ? responsavelConclusao : undefined
+      } : p))
     );
-    return await dbService.updateStatusPassagem(id, newStatus, conclDate);
+    return await dbService.updateStatusPassagem(id, newStatus, conclDate, observacaoConclusao, responsavelConclusao);
   }, []);
 
   const handleDeletePassagem = useCallback(async (id: string) => {
     setPassagens((prev) => prev.filter((p) => p.id !== id));
     return await dbService.deletePassagem(id);
+  }, []);
+
+  const handleAddComentarioPassagem = useCallback(async (passagemId: string, comentario: any) => {
+    setPassagens((prev) =>
+      prev.map((p) => {
+        if (p.id === passagemId) {
+          return {
+            ...p,
+            comentarios: [...(p.comentarios || []), comentario]
+          };
+        }
+        return p;
+      })
+    );
+    return await dbService.addComentarioPassagem(passagemId, comentario);
   }, []);
 
   const handleResetData = useCallback(async () => {
@@ -179,6 +205,7 @@ export default function App() {
             onUpdatePassagem={handleUpdatePassagem}
             onUpdateStatusPassagem={handleUpdatePassagemStatus}
             onDeletePassagem={handleDeletePassagem}
+            onAddComentarioPassagem={handleAddComentarioPassagem}
           />
         )}
 

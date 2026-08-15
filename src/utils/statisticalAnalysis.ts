@@ -287,7 +287,9 @@ export function exportPassagensToCSV(passagens: any[], filename = 'fechamentos_d
     'Status',
     'Data/Hora de Conclusão',
     'Horas Úteis de Trabalho',
-    'Situação do SLA (Limite 24h)'
+    'Situação do SLA (Limite 24h)',
+    'Solução / Conclusão Aplicada',
+    'Responsável pela Conclusão'
   ];
 
   const rows = passagens.map((p) => {
@@ -304,7 +306,9 @@ export function exportPassagensToCSV(passagens: any[], filename = 'fechamentos_d
       `"${isConcluido ? 'Concluído' : 'Pendente'}"`,
       `"${p.dataHoraConclusao ? formatBrazilianDate(p.dataHoraConclusao) : 'Não concluído'}"`,
       `"${sla.workingHoursFormatted} (${sla.workingHours}h úteis)"`,
-      `"${sla.mensagemSla.replace(/"/g, '""')}"`
+      `"${sla.mensagemSla.replace(/"/g, '""')}"`,
+      `"${(p.observacaoConclusao || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`,
+      `"${(p.responsavelConclusao || '').replace(/"/g, '""')}"`
     ];
   });
 

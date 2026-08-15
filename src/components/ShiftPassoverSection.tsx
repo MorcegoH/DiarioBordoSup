@@ -1,12 +1,12 @@
 /**
  * @file src/components/ShiftPassoverSection.tsx
  * @description SEÇÃO 4: Fechamento de Turno, Controle de Pendências & Cálculo de SLA de 24h Úteis de Trabalho.
- * Gerencia os registros de passagem de bastão, computa data de criação/conclusão, sinaliza atrasos na jornada
- * e permite exportação estruturada para CSV com autorização segura por senha para edição e exclusão.
+ * Gerencia os registros de passagem de bastão, modal para leitura detalhada de 'O que funcionou bem',
+ * modal de tabulação e justificativa de solução para conclusão de pendências, e exportação CSV.
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
-import { Ocorrencia, ResumoPassagem } from '../types';
+import { Ocorrencia, ResumoPassagem, ComentarioPassagem } from '../types';
 import { 
   formatBrazilianDate, 
   calculateWorkingHoursSla, 
@@ -17,7 +17,9 @@ import { DbOperationResult } from '../services/dbService';
 import { 
   Check, CheckCircle2, AlertTriangle, User, Calendar, 
   Clock, Download, Save, Edit3, Trash2, RotateCcw, AlertCircle, 
-  Search, X, Lock, CheckCircle, ShieldAlert, Sparkles, Filter
+  Search, X, Lock, CheckCircle, Sparkles, Maximize2, FileText,
+  MessageSquare, ExternalLink, HelpCircle, Send, Lightbulb, ThumbsUp,
+  CornerDownRight, MessageCircle, ShieldCheck, Tag
 } from 'lucide-react';
 
 interface ShiftPassoverSectionProps {
@@ -25,8 +27,14 @@ interface ShiftPassoverSectionProps {
   passagens: ResumoPassagem[];
   onSavePassagem: (passagem: ResumoPassagem) => Promise<DbOperationResult | void>;
   onUpdatePassagem?: (passagem: ResumoPassagem) => Promise<DbOperationResult | void>;
-  onUpdateStatusPassagem?: (id: string, status: 'Pendente' | 'Concluído') => Promise<DbOperationResult | void>;
+  onUpdateStatusPassagem?: (
+    id: string, 
+    status: 'Pendente' | 'Concluído',
+    observacaoConclusao?: string,
+    responsavelConclusao?: string
+  ) => Promise<DbOperationResult | void>;
   onDeletePassagem?: (id: string) => Promise<DbOperationResult | void>;
+  onAddComentarioPassagem?: (passagemId: string, comentario: ComentarioPassagem) => Promise<DbOperationResult | void>;
   defaultSupervisor?: string;
 }
 
@@ -37,6 +45,7 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
   onUpdatePassagem,
   onUpdateStatusPassagem,
   onDeletePassagem,
+  onAddComentarioPassagem,
   defaultSupervisor = 'Debora Rodrigues'
 }) => {
   // Estados do formulário de novo fechamento
@@ -56,6 +65,27 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
   const [busca, setBusca] = useState<string>('');
   const [filtroStatus, setFiltroStatus] = useState<'todos' | 'pendentes' | 'concluidos' | 'atrasados'>('todos');
   const [filtroSupervisor, setFiltroSupervisor] = useState<string>('');
+
+  // Estado para Modal de Leitura Detalhada ("O que funcionou bem" ou "Pendência")
+  const [viewingDetail, setViewingDetail] = useState<{
+    titulo: string;
+    tipo: 'funcionou' | 'pendente' | 'solucao' | 'geral';
+    texto: string;
+    passagem: ResumoPassagem;
+  } | null>(null);
+
+  // Estados para formulário de comentários de líderes no Modal
+  const [comentarioAutor, setComentarioAutor] = useState<string>(defaultSupervisor);
+  const [comentarioTexto, setComentarioTexto] = useState<string>('');
+  const [comentarioTipo, setComentarioTipo] = useState<'auxilio' | 'reconhecimento' | 'alinhamento'>('reconhecimento');
+  const [isSavingComentario, setIsSavingComentario] = useState<boolean>(false);
+  const [comentarioFeedback, setComentarioFeedback] = useState<string | null>(null);
+
+  // Estado para Modal de Tabulação / Conclusão de Pendência
+  const [concludingPassagem, setConcludingPassagem] = useState<ResumoPassagem | null>(null);
+  const [conclusaoObservacao, setConclusaoObservacao] = useState<string>('');
+  const [conclusaoResponsavel, setConclusaoResponsavel] = useState<string>(defaultSupervisor);
+  const [isSavingConclusao, setIsSavingConclusao] = useState<boolean>(false);
 
   // Estados de Edição com Senha
   const [editingPassagem, setEditingPassagem] = useState<ResumoPassagem | null>(null);
@@ -134,14 +164,44 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
     }
   };
 
-  // Handler de Conclusão / Reabertura de Pendência
-  const handleToggleStatus = useCallback(async (passagem: ResumoPassagem) => {
+  // Abrir modal de Tabulação para concluir pendência
+  const handleAbrirConclusao = useCallback((passagem: ResumoPassagem) => {
+    setConcludingPassagem(passagem);
+    setConclusaoObservacao(passagem.observacaoConclusao || '');
+    setConclusaoResponsavel(passagem.responsavelConclusao || supervisor || defaultSupervisor);
+  }, [supervisor, defaultSupervisor]);
+
+  // Confirmar Tabulação e Conclusão de Pendência
+  const handleConfirmarConclusao = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!concludingPassagem || !onUpdateStatusPassagem) return;
+
+    const cleanObservacao = sanitizeTextInput(conclusaoObservacao, 3000);
+    const cleanResponsavel = sanitizeTextInput(conclusaoResponsavel, 100);
+
+    if (!cleanObservacao || cleanObservacao.trim().length < 5) {
+      alert('Por favor, informe a tabulação com a descrição da conclusão ou solução aplicada (mínimo 5 caracteres).');
+      return;
+    }
+
+    setIsSavingConclusao(true);
+    await onUpdateStatusPassagem(
+      concludingPassagem.id, 
+      'Concluído', 
+      cleanObservacao, 
+      cleanResponsavel
+    );
+    setIsSavingConclusao(false);
+    setConcludingPassagem(null);
+    setConclusaoObservacao('');
+  };
+
+  // Reabrir Pendência
+  const handleReabrirPendencia = useCallback(async (passagem: ResumoPassagem) => {
     if (!onUpdateStatusPassagem) return;
-
-    const isCurrentlyConcluido = passagem.status === 'Concluído' || Boolean(passagem.dataHoraConclusao);
-    const newStatus = isCurrentlyConcluido ? 'Pendente' : 'Concluído';
-
-    await onUpdateStatusPassagem(passagem.id, newStatus);
+    if (window.confirm('Deseja reabrir esta pendência? Ela voltará para o status "Pendente".')) {
+      await onUpdateStatusPassagem(passagem.id, 'Pendente');
+    }
   }, [onUpdateStatusPassagem]);
 
   // Handler de Edição com Validação de Senha de Segurança
@@ -193,6 +253,61 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
     }
   }, [onDeletePassagem]);
 
+  // Handler para abrir modal de detalhes ajustando o tipo de comentário inicial
+  const handleAbrirDetalhes = useCallback((
+    titulo: string, 
+    tipo: 'funcionou' | 'pendente' | 'solucao' | 'geral', 
+    texto: string, 
+    passagem: ResumoPassagem
+  ) => {
+    setViewingDetail({ titulo, tipo, texto, passagem });
+    setComentarioTexto('');
+    setComentarioFeedback(null);
+    setComentarioAutor(defaultSupervisor);
+    if (tipo === 'pendente') {
+      setComentarioTipo('auxilio');
+    } else if (tipo === 'funcionou') {
+      setComentarioTipo('reconhecimento');
+    } else {
+      setComentarioTipo('alinhamento');
+    }
+  }, [defaultSupervisor]);
+
+  // Handler para salvar novo comentário ou apontamento de auxílio do líder
+  const handleEnviarComentario = async (e: React.FormEvent, passagemId: string) => {
+    e.preventDefault();
+    if (!onAddComentarioPassagem) return;
+
+    const cleanTexto = sanitizeTextInput(comentarioTexto, 3000);
+    const cleanAutor = sanitizeTextInput(comentarioAutor, 100);
+
+    if (!cleanTexto || cleanTexto.trim().length < 3) {
+      alert('Por favor, digite seu comentário ou auxílio (mínimo de 3 caracteres).');
+      return;
+    }
+
+    setIsSavingComentario(true);
+    const novoComentario: ComentarioPassagem = {
+      id: 'com-' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4),
+      autor: cleanAutor || defaultSupervisor,
+      contexto: viewingDetail?.tipo === 'funcionou' ? 'funcionou' : (viewingDetail?.tipo === 'pendente' ? 'pendente' : 'geral'),
+      tipo: comentarioTipo,
+      mensagem: cleanTexto,
+      dataHora: new Date().toISOString()
+    };
+
+    try {
+      await onAddComentarioPassagem(passagemId, novoComentario);
+      setComentarioTexto('');
+      setComentarioFeedback('Comentário registrado e salvo com sucesso!');
+      setTimeout(() => setComentarioFeedback(null), 4000);
+    } catch (err: any) {
+      alert('Erro ao salvar comentário: ' + (err?.message || 'Falha ao registrar comentário'));
+    } finally {
+      setIsSavingComentario(false);
+    }
+  };
+
   // Filtragem e Estatísticas dos Registros Salvos
   const passagensProcessadas = useMemo(() => {
     return passagens.map((p) => {
@@ -236,6 +351,7 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
         p.supervisor.toLowerCase().includes(termo) ||
         p.oQueFuncionou.toLowerCase().includes(termo) ||
         p.oQueFicaPendente.toLowerCase().includes(termo) ||
+        (p.observacaoConclusao && p.observacaoConclusao.toLowerCase().includes(termo)) ||
         p.data.includes(termo);
 
       const matchSupervisor = !filtroSupervisor || p.supervisor === filtroSupervisor;
@@ -268,7 +384,7 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
                 Fechamento de Turno & Registro de Pendências
               </h2>
               <p className="text-xs text-gray-500 font-medium">
-                Consolidação diária de passagem de bastão operacional, controle de pendências e acompanhamento de SLA
+                Consolidação diária de passagem de bastão operacional, controle de pendências e tabulação de conclusões
               </p>
             </div>
           </div>
@@ -424,7 +540,7 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
               Controle de Passagem de Bastão & Pendências Salvas
             </h3>
             <p className="text-xs text-gray-500 font-medium">
-              Acompanhamento de criação, data de conclusão e controle de atraso por jornada de trabalho comercial (Limite: 24h úteis)
+              Clique nos cards para abrir a leitura completa. Conclusões exigem tabulação de solução.
             </p>
           </div>
 
@@ -438,16 +554,6 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
               <Download className="w-4 h-4 text-emerald-200" />
               <span>Exportar para CSV</span>
             </button>
-          </div>
-        </div>
-
-        {/* Informação da Regra de Jornada Comercial */}
-        <div className="bg-blue-50/80 border border-blue-200 rounded-lg p-3 text-xs text-blue-900 mb-5 flex items-start gap-2.5">
-          <Clock className="w-4 h-4 text-blue-700 shrink-0 mt-0.5" />
-          <div className="leading-relaxed">
-            <strong className="block text-blue-950 font-bold">Regra de Jornada Operacional & SLA de 24h:</strong>
-            Horário útil considerado: <strong>Segunda a Sexta das 08:00 às 18:00 (10h/dia)</strong> e <strong>Sábados das 08:00 às 12:00 (4h/dia)</strong>.
-            Domingos e períodos fora do expediente não contabilizam horas úteis. Se a pendência ultrapassar <strong>24 horas úteis de trabalho</strong> sem conclusão, o sistema sinaliza <strong>Atraso</strong> automaticamente.
           </div>
         </div>
 
@@ -517,7 +623,7 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
             <input
               type="text"
-              placeholder="Buscar por supervisor, pendência ou o que funcionou..."
+              placeholder="Buscar por supervisor, pendência, o que funcionou ou solução aplicada..."
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#005b2e]"
@@ -630,71 +736,155 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
                   </div>
 
                   {/* Conteúdo: O que funcionou e O que fica pendente */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-                    <div className="bg-emerald-50/70 p-3 rounded-lg border border-emerald-100">
-                      <span className="font-bold text-emerald-900 block mb-1 flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
-                        O que funcionou bem:
-                      </span>
-                      <p className="text-emerald-950 whitespace-pre-wrap leading-relaxed">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                    
+                    {/* Card Interativo: O que funcionou bem (Clique para abrir modal com detalhes completos e comentários) */}
+                    <div 
+                      onClick={() => handleAbrirDetalhes(
+                        'O Que Funcionou Bem no Turno',
+                        'funcionou',
+                        p.oQueFuncionou || 'Nenhum detalhe informado.',
+                        p
+                      )}
+                      className="bg-emerald-50/70 hover:bg-emerald-100/70 p-3 rounded-lg border border-emerald-200/80 hover:border-emerald-400 transition-all cursor-pointer group shadow-2xs"
+                      title="Clique para abrir, ler detalhes e interagir com comentários/elogios"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-bold text-emerald-900 flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                          O que funcionou bem:
+                        </span>
+                        <span className="text-[10px] text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded flex items-center gap-1 group-hover:bg-emerald-200 transition-colors">
+                          <Maximize2 className="w-3 h-3" />
+                          Detalhes & Comentários
+                        </span>
+                      </div>
+                      <p className="text-emerald-950 whitespace-pre-wrap leading-relaxed line-clamp-3">
                         {p.oQueFuncionou || 'Nenhum detalhe informado.'}
                       </p>
                     </div>
 
-                    <div className={`p-3 rounded-lg border leading-relaxed ${
-                      isAtrasado && !isConcluido
-                        ? 'bg-red-50 border-red-200 text-red-950 font-medium'
-                        : 'bg-amber-50/70 border-amber-100 text-amber-950'
-                    }`}>
-                      <span className="font-bold block mb-1 flex items-center justify-between">
-                        <span className="flex items-center gap-1 text-amber-900">
+                    {/* Card Interativo: O que fica pendente (Clique para abrir modal com detalhes e auxílio) */}
+                    <div 
+                      onClick={() => handleAbrirDetalhes(
+                        'O Que Ficou Pendente para o Próximo Turno',
+                        'pendente',
+                        p.oQueFicaPendente || 'Nenhuma pendência registrada.',
+                        p
+                      )}
+                      className={`p-3 rounded-lg border leading-relaxed cursor-pointer transition-all group shadow-2xs ${
+                        isAtrasado && !isConcluido
+                          ? 'bg-red-50/80 hover:bg-red-100/80 border-red-200 hover:border-red-400 text-red-950 font-medium'
+                          : 'bg-amber-50/70 hover:bg-amber-100/70 border-amber-200/80 hover:border-amber-400 text-amber-950'
+                      }`}
+                      title="Clique para abrir, ler pendência e pontuar auxílio/plano de ação"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-bold flex items-center gap-1 text-amber-900">
                           <AlertTriangle className="w-3.5 h-3.5 text-amber-700" />
-                          O que ficou para o próximo turno (Pendência):
+                          O que ficou para o próximo turno:
                         </span>
-                        <span className="text-[10px] font-bold text-gray-500">
-                          {p.sla.workingHoursFormatted} de jornada
+                        <span className="text-[10px] text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded flex items-center gap-1 group-hover:bg-amber-200 transition-colors">
+                          <Maximize2 className="w-3 h-3" />
+                          Detalhes & Auxílio
                         </span>
-                      </span>
-                      <p className="whitespace-pre-wrap font-medium">
+                      </div>
+                      <p className="whitespace-pre-wrap font-medium line-clamp-3">
                         {p.oQueFicaPendente || 'Nenhuma pendência registrada.'}
                       </p>
                     </div>
                   </div>
 
-                  {/* Barra de Ações: Conclusão, Edição (Senha) e Exclusão (Senha) */}
+                  {/* Seção de Conclusão / Solução Aplicada (Quando Concluído) */}
+                  {isConcluido && (
+                    <div 
+                      onClick={() => handleAbrirDetalhes(
+                        'Tabulação: Solução / Conclusão Aplicada',
+                        'solucao',
+                        p.observacaoConclusao || 'Pendência marcada como concluída sem detalhes adicionais.',
+                        p
+                      )}
+                      className="bg-emerald-100/50 hover:bg-emerald-100/80 p-3 rounded-lg border border-emerald-300 text-emerald-950 mb-3 cursor-pointer transition-all group"
+                      title="Clique para ler a tabulação completa da solução aplicada"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-bold flex items-center gap-1.5 text-emerald-900">
+                          <CheckCircle className="w-3.5 h-3.5 text-emerald-700" />
+                          Solução / Conclusão Aplicada:
+                          {p.responsavelConclusao && (
+                            <span className="font-normal text-emerald-800 text-[11px]">
+                              (por <strong>{p.responsavelConclusao}</strong> em {p.dataHoraConclusao ? formatBrazilianDate(p.dataHoraConclusao) : ''})
+                            </span>
+                          )}
+                        </span>
+                        <span className="text-[10px] text-emerald-800 bg-emerald-200/70 px-1.5 py-0.5 rounded flex items-center gap-1">
+                          <Maximize2 className="w-3 h-3" />
+                          Ver Tabulação
+                        </span>
+                      </div>
+                      <p className="whitespace-pre-wrap text-emerald-950 line-clamp-2 italic">
+                        "{p.observacaoConclusao || 'Concluído diretamente pelo supervisor.'}"
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Barra de Ações: Conclusão com Tabulação, Botão de Comentários, Edição e Exclusão */}
                   <div className="flex flex-wrap items-center justify-between pt-2 border-t border-gray-200/80 gap-2">
                     
-                    {/* Status de SLA Informativo */}
-                    <div className="text-[11px] font-medium text-gray-600 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-gray-400" />
-                      <span>{p.sla.mensagemSla}</span>
+                    {/* Status de SLA e Contador de Comentários */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="text-[11px] font-medium text-gray-600 flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-gray-400" />
+                        <span>{p.sla.mensagemSla}</span>
+                      </div>
+
+                      {/* Botão / Contador de Comentários de Líderes */}
+                      <button
+                        onClick={() => handleAbrirDetalhes(
+                          'Espaço Colaborativo dos Líderes • Fechamento de Turno',
+                          'geral',
+                          `O QUE FUNCIONOU BEM:\n${p.oQueFuncionou || 'N/A'}\n\nO QUE FICOU PENDENTE:\n${p.oQueFicaPendente || 'N/A'}`,
+                          p
+                        )}
+                        className={`px-2.5 py-1 rounded-full font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer ${
+                          p.comentarios && p.comentarios.length > 0
+                            ? 'bg-indigo-100 text-indigo-800 border border-indigo-300 hover:bg-indigo-200'
+                            : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
+                        }`}
+                        title="Abrir área de comentários e auxílio da liderança"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>
+                          {p.comentarios && p.comentarios.length > 0
+                            ? `${p.comentarios.length} comentário${p.comentarios.length > 1 ? 's' : ''} de líderes`
+                            : 'Comentar / Auxiliar'}
+                        </span>
+                      </button>
                     </div>
 
                     {/* Botões de Ação */}
                     <div className="flex items-center gap-2">
                       
-                      {/* Botão de Conclusão */}
-                      <button
-                        onClick={() => handleToggleStatus(p)}
-                        className={`px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-95 ${
-                          isConcluido
-                            ? 'bg-gray-200 hover:bg-gray-300 text-gray-800'
-                            : 'bg-emerald-700 hover:bg-emerald-800 text-white'
-                        }`}
-                        title={isConcluido ? 'Reabrir esta pendência' : 'Marcar pendência como concluída'}
-                      >
-                        {isConcluido ? (
-                          <>
-                            <RotateCcw className="w-3.5 h-3.5" />
-                            <span>Reabrir Pendência</span>
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Marcar como Concluído</span>
-                          </>
-                        )}
-                      </button>
+                      {/* Botão de Conclusão com Tabulação Obrigatória */}
+                      {isConcluido ? (
+                        <button
+                          onClick={() => handleReabrirPendencia(p)}
+                          className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-95"
+                          title="Reabrir esta pendência"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>Reabrir Pendência</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleAbrirConclusao(p)}
+                          className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-95"
+                          title="Marcar pendência como concluída e tabula a solução aplicada"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Marcar como Concluído</span>
+                        </button>
+                      )}
 
                       {/* Botão de Edição (Mediante Senha) */}
                       <button
@@ -728,7 +918,391 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
 
       </div>
 
-      {/* MODAL DE EDIÇÃO DE REGISTRO COM SENHA */}
+      {/* MODAL 1: LEITURA DETALHADA E ÁREA COLABORATIVA DE COMENTÁRIOS E AUXÍLIO DOS LÍDERES */}
+      {viewingDetail && (() => {
+        const currentPassagem = passagens.find((p) => p.id === viewingDetail.passagem.id) || viewingDetail.passagem;
+        const comentarios = currentPassagem.comentarios || [];
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+            <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden border border-gray-200 text-gray-800">
+              
+              {/* Header do Modal */}
+              <div className={`p-4 flex items-center justify-between text-white shrink-0 ${
+                viewingDetail.tipo === 'funcionou'
+                  ? 'bg-emerald-800'
+                  : viewingDetail.tipo === 'pendente'
+                  ? 'bg-amber-700'
+                  : 'bg-indigo-900'
+              }`}>
+                <div className="flex items-center gap-2">
+                  {viewingDetail.tipo === 'funcionou' ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-200" />
+                  ) : viewingDetail.tipo === 'pendente' ? (
+                    <AlertTriangle className="w-5 h-5 text-amber-200" />
+                  ) : (
+                    <MessageSquare className="w-5 h-5 text-indigo-200" />
+                  )}
+                  <div>
+                    <h3 className="text-base font-bold leading-tight">{viewingDetail.titulo}</h3>
+                    <p className="text-[11px] text-white/80">Espaço de leitura, alinhamento e auxílio colaborativo entre líderes</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setViewingDetail(null)}
+                  className="p-1 rounded text-white/80 hover:text-white hover:bg-white/10"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Metadados */}
+              <div className="bg-gray-50 px-5 py-2.5 border-b border-gray-200 text-xs text-gray-600 flex flex-wrap items-center justify-between gap-2 shrink-0">
+                <span className="flex items-center gap-1 font-medium">
+                  <User className="w-3.5 h-3.5 text-gray-500" />
+                  Supervisor do Turno: <strong>{currentPassagem.supervisor}</strong>
+                </span>
+                <span className="flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5 text-gray-500" />
+                  Data de Criação: {formatBrazilianDate(currentPassagem.dataHoraCriacao)}
+                </span>
+              </div>
+
+              {/* Corpo com Scroll */}
+              <div className="p-5 overflow-y-auto space-y-5 flex-grow text-xs">
+                
+                {/* 1. Conteúdo Original Selecionado */}
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5 flex items-center justify-between">
+                    <span>Registro Original do Supervisor</span>
+                    <span className="text-gray-400 font-normal">Data: {currentPassagem.data}</span>
+                  </label>
+                  <div className={`p-4 rounded-lg border text-sm leading-relaxed whitespace-pre-wrap font-sans ${
+                    viewingDetail.tipo === 'funcionou'
+                      ? 'bg-emerald-50/80 border-emerald-200 text-emerald-950'
+                      : viewingDetail.tipo === 'pendente'
+                      ? 'bg-amber-50/80 border-amber-200 text-amber-950 font-medium'
+                      : 'bg-gray-50 border-gray-200 text-gray-900'
+                  }`}>
+                    {viewingDetail.texto}
+                  </div>
+                </div>
+
+                {/* 2. Seção de Comentários e Auxílio de Outros Líderes */}
+                <div className="border-t border-gray-200 pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-bold text-gray-800 text-sm flex items-center gap-1.5">
+                      <MessageCircle className="w-4 h-4 text-indigo-600" />
+                      Comentários & Pontuações de Auxílio dos Líderes
+                      <span className="bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded-full text-xs ml-1">
+                        {comentarios.length}
+                      </span>
+                    </h4>
+                  </div>
+
+                  {/* Lista de Comentários Anteriores */}
+                  {comentarios.length === 0 ? (
+                    <div className="bg-indigo-50/40 rounded-lg p-4 text-center border border-dashed border-indigo-200 text-indigo-900 mb-4">
+                      <Lightbulb className="w-6 h-6 mx-auto mb-1 text-indigo-500" />
+                      <p className="font-semibold text-xs">Nenhum líder comentou neste registro ainda.</p>
+                      <p className="text-[11px] text-indigo-700 mt-0.5">
+                        Utilize o formulário abaixo para elogiar o que deu certo ou pontuar um plano de auxílio para o que ficou pendente!
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5 mb-4">
+                      {comentarios.map((com) => {
+                        const isAuxilio = com.tipo === 'auxilio';
+                        const isReconhecimento = com.tipo === 'reconhecimento';
+
+                        return (
+                          <div 
+                            key={com.id} 
+                            className={`p-3.5 rounded-lg border text-xs transition-all ${
+                              isAuxilio
+                                ? 'bg-amber-50/70 border-amber-200 text-amber-950'
+                                : isReconhecimento
+                                ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
+                                : 'bg-gray-50 border-gray-200 text-gray-900'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
+                              <div className="flex items-center gap-2">
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-[10px] text-white shrink-0 ${
+                                  isAuxilio ? 'bg-amber-700' : isReconhecimento ? 'bg-emerald-700' : 'bg-indigo-700'
+                                }`}>
+                                  {com.autor.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                                </div>
+                                <span className="font-bold text-gray-900">{com.autor}</span>
+
+                                {/* Badge de Tipo de Comentário */}
+                                {isAuxilio && (
+                                  <span className="bg-amber-200 text-amber-900 font-bold px-2 py-0.5 rounded text-[10px] flex items-center gap-1">
+                                    <Lightbulb className="w-3 h-3 text-amber-800" />
+                                    Auxílio / Solução
+                                  </span>
+                                )}
+                                {isReconhecimento && (
+                                  <span className="bg-emerald-200 text-emerald-900 font-bold px-2 py-0.5 rounded text-[10px] flex items-center gap-1">
+                                    <ThumbsUp className="w-3 h-3 text-emerald-800" />
+                                    Elogio / Reconhecimento
+                                  </span>
+                                )}
+                                {!isAuxilio && !isReconhecimento && (
+                                  <span className="bg-blue-100 text-blue-900 font-bold px-2 py-0.5 rounded text-[10px] flex items-center gap-1">
+                                    <Tag className="w-3 h-3 text-blue-800" />
+                                    Alinhamento
+                                  </span>
+                                )}
+                              </div>
+
+                              <span className="text-[10px] text-gray-500">
+                                {formatBrazilianDate(com.dataHora)}
+                              </span>
+                            </div>
+
+                            <p className="whitespace-pre-wrap leading-relaxed pl-8 font-sans">
+                              {com.mensagem}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* 3. Formulário para Adicionar Comentário / Auxílio */}
+                  <form onSubmit={(e) => handleEnviarComentario(e, currentPassagem.id)} className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-gray-800 flex items-center gap-1.5 text-xs">
+                        <Send className="w-3.5 h-3.5 text-indigo-600" />
+                        Novo Comentário ou Auxílio da Liderança
+                      </span>
+                      {comentarioFeedback && (
+                        <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded animate-pulse">
+                          {comentarioFeedback}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Seleção do Líder Autor */}
+                      <div>
+                        <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                          Líder Responsável pelo Comentário:
+                        </label>
+                        <select
+                          value={comentarioAutor}
+                          onChange={(e) => setComentarioAutor(e.target.value)}
+                          className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-1 focus:ring-indigo-500"
+                        >
+                          <option value="Heder Santos">Heder Santos (Gerente de Vendas)</option>
+                          <option value="Debora Rodrigues">Debora Rodrigues (Supervisora)</option>
+                          <option value="Marilia Farias">Marilia Farias (Supervisora)</option>
+                        </select>
+                      </div>
+
+                      {/* Tipo de Apontamento */}
+                      <div>
+                        <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                          Objetivo do Apontamento:
+                        </label>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setComentarioTipo('auxilio')}
+                            className={`flex-1 py-1.5 px-2 rounded-md text-[11px] font-bold flex items-center justify-center gap-1 border transition-all ${
+                              comentarioTipo === 'auxilio'
+                                ? 'bg-amber-100 border-amber-400 text-amber-900 ring-1 ring-amber-500/40'
+                                : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-100'
+                            }`}
+                          >
+                            <Lightbulb className="w-3 h-3 text-amber-600" />
+                            Auxílio
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setComentarioTipo('reconhecimento')}
+                            className={`flex-1 py-1.5 px-2 rounded-md text-[11px] font-bold flex items-center justify-center gap-1 border transition-all ${
+                              comentarioTipo === 'reconhecimento'
+                                ? 'bg-emerald-100 border-emerald-400 text-emerald-900 ring-1 ring-emerald-500/40'
+                                : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-100'
+                            }`}
+                          >
+                            <ThumbsUp className="w-3 h-3 text-emerald-600" />
+                            Elogio
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setComentarioTipo('alinhamento')}
+                            className={`flex-1 py-1.5 px-2 rounded-md text-[11px] font-bold flex items-center justify-center gap-1 border transition-all ${
+                              comentarioTipo === 'alinhamento'
+                                ? 'bg-indigo-100 border-indigo-400 text-indigo-900 ring-1 ring-indigo-500/40'
+                                : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-100'
+                            }`}
+                          >
+                            <Tag className="w-3 h-3 text-indigo-600" />
+                            Geral
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Campo de Texto do Comentário */}
+                    <div>
+                      <textarea
+                        required
+                        rows={3}
+                        value={comentarioTexto}
+                        onChange={(e) => setComentarioTexto(e.target.value)}
+                        placeholder={
+                          comentarioTipo === 'auxilio'
+                            ? "Pontue como você pode auxiliar nesta pendência, sugira um plano de ação ou direcione a resolução..."
+                            : comentarioTipo === 'reconhecimento'
+                            ? "Deixe um elogio ou reconhecimento pelo que funcionou bem hoje no turno..."
+                            : "Escreva suas observações ou alinhamentos operacionais..."
+                        }
+                        className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+
+                    {/* Botão de Salvar Comentário */}
+                    <div className="flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={isSavingComentario || !comentarioTexto.trim()}
+                        className="px-4 py-2 bg-indigo-700 hover:bg-indigo-800 disabled:opacity-50 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        <span>{isSavingComentario ? 'Salvando...' : 'Salvar Comentário / Auxílio'}</span>
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+              </div>
+
+              {/* Rodapé */}
+              <div className="p-4 bg-gray-50 border-t border-gray-200 flex justify-end shrink-0">
+                <button
+                  onClick={() => setViewingDetail(null)}
+                  className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-semibold text-xs transition-colors"
+                >
+                  Fechar
+                </button>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* MODAL 2: TABULAÇÃO E JUSTIFICATIVA DE CONCLUSÃO DA PENDÊNCIA */}
+      {concludingPassagem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-xl shadow-2xl max-w-xl w-full overflow-hidden border border-gray-200 text-gray-800">
+            
+            {/* Header do Modal */}
+            <div className="bg-emerald-800 text-white p-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-300" />
+                <h3 className="text-base font-bold">Tabulação de Conclusão da Pendência</h3>
+              </div>
+              <button
+                onClick={() => setConcludingPassagem(null)}
+                className="p-1 rounded text-white/80 hover:text-white hover:bg-white/10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Resumo da Pendência Original */}
+            <div className="bg-amber-50 p-4 border-b border-amber-200 text-xs">
+              <span className="font-bold text-amber-900 block mb-1 flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-700" />
+                Pendência que ficou para este turno:
+              </span>
+              <p className="text-amber-950 whitespace-pre-wrap leading-relaxed line-clamp-3 bg-white/70 p-2 rounded border border-amber-200/60">
+                {concludingPassagem.oQueFicaPendente}
+              </p>
+              <div className="mt-2 text-[11px] text-amber-800 flex justify-between">
+                <span>Criado por: <strong>{concludingPassagem.supervisor}</strong></span>
+                <span>Data: {formatBrazilianDate(concludingPassagem.dataHoraCriacao)}</span>
+              </div>
+            </div>
+
+            {/* Formulário de Tabulação */}
+            <form onSubmit={handleConfirmarConclusao} className="p-5 space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-gray-700 uppercase mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <User className="w-3.5 h-3.5 text-emerald-700" />
+                    Responsável pela Conclusão / Resolução *
+                  </span>
+                </label>
+                <select
+                  value={conclusaoResponsavel}
+                  onChange={(e) => setConclusaoResponsavel(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#005b2e] font-medium"
+                >
+                  <option value="Heder Santos">Heder Santos (Gerente de Vendas)</option>
+                  <option value="Debora Rodrigues">Debora Rodrigues (Supervisora)</option>
+                  <option value="Marilia Farias">Marilia Farias (Supervisora)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-gray-700 uppercase mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <FileText className="w-3.5 h-3.5 text-emerald-700" />
+                    Qual foi a conclusão / solução aplicada? *
+                  </span>
+                  <span className="text-[10px] text-gray-400 font-normal">Obrigatório</span>
+                </label>
+                <textarea
+                  required
+                  rows={4}
+                  value={conclusaoObservacao}
+                  onChange={(e) => setConclusaoObservacao(e.target.value)}
+                  placeholder="Explique detalhadamente como a pendência foi tratada e resolvida (ex: 'Chamado #4892 foi atendido pela TI e a fila de discagem voltou a operar normalmente')..."
+                  className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#005b2e]"
+                />
+              </div>
+
+              <div className="bg-emerald-50 p-2.5 rounded border border-emerald-200 text-emerald-800 text-[11px] flex items-center gap-2">
+                <Clock className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>
+                  A data e hora de conclusão (<strong>{new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</strong>) serão registradas automaticamente para fins de SLA.
+                </span>
+              </div>
+
+              {/* Botões do Modal */}
+              <div className="flex justify-end gap-2 pt-3 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setConcludingPassagem(null)}
+                  className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-semibold"
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isSavingConclusao}
+                  className="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{isSavingConclusao ? 'Salvando...' : 'Concluir Pendência & Salvar'}</span>
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: EDIÇÃO DE REGISTRO COM SENHA */}
       {editingPassagem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
           <div className="bg-white rounded-xl shadow-2xl max-w-xl w-full overflow-hidden border border-gray-200 text-gray-800">
