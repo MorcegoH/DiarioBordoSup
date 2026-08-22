@@ -232,8 +232,8 @@ export const DiscountRequestsTable: React.FC<DiscountRequestsTableProps> = React
             className="px-2.5 py-1.5 text-xs bg-gray-50 border border-gray-300 rounded-lg text-gray-700 font-medium cursor-pointer"
           >
             <option value="TODAS">Liderança: Todas</option>
-            <option value="Débora">Débora Rodrigues</option>
-            <option value="Marília">Marília Farias</option>
+            <option value="Débora">Débora Rodrigues (Supervisão)</option>
+            <option value="Gerência">Gerência (Heder Santos)</option>
           </select>
 
           {/* Tipo de Desconto */}

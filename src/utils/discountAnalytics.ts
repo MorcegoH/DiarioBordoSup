@@ -95,7 +95,6 @@ export function gerarDadosSimuladosDesconto(): SolicitacaoDesconto[] {
   const diaAtual = hoje.getDate();
 
   const mockConsultoresDebora = HIERARQUIA_EQUIPES.supervisoras['Débora Rodrigues'];
-  const mockConsultoresMarilia = HIERARQUIA_EQUIPES.supervisoras['Marília Farias'];
 
   const lista: SolicitacaoDesconto[] = [];
 
@@ -117,14 +116,13 @@ export function gerarDadosSimuladosDesconto(): SolicitacaoDesconto[] {
     const qtdNoDia = (dia % 3 === 0 || dia === diasParaGerar) ? 3 : (dia % 2 === 0 ? 2 : 1);
 
     for (let k = 0; k < qtdNoDia; k++) {
-      const isDebora = (idCounter % 2 === 0);
-      const supervisora = isDebora ? 'Débora Rodrigues' : 'Marília Farias';
-      const consultores = isDebora ? mockConsultoresDebora : mockConsultoresMarilia;
+      const supervisora = 'Débora Rodrigues';
+      const consultores = mockConsultoresDebora;
       
       // Alguns consultores pedem mais frequentemente (para criar variabilidade na matriz de calor)
       let consultor = consultores[idCounter % consultores.length];
-      if (k === 0 && isDebora) consultor = 'Everton'; // Mais dependente
-      if (k === 0 && !isDebora) consultor = 'Kelvin'; // Mais dependente
+      if (k === 0 && (idCounter % 4 === 0)) consultor = 'Everton'; // Mais dependente
+      if (k === 0 && (idCounter % 4 === 2)) consultor = 'Kelvin'; // Mais dependente
 
       const isAdesao = (idCounter % 3 !== 0);
       const tipoDesconto: TipoDesconto = isAdesao ? 'Adesão' : 'Plano';
@@ -399,8 +397,7 @@ export function calcularRiscoSLA(solicitacoes: SolicitacaoDesconto[]): SLARiskAn
   let totalAtrasadas = 0; // > 240 minutos
 
   const minutosSupervisora: Record<string, { totalMin: number; count: number }> = {
-    'Débora Rodrigues': { totalMin: 0, count: 0 },
-    'Marília Farias': { totalMin: 0, count: 0 }
+    'Débora Rodrigues': { totalMin: 0, count: 0 }
   };
 
   const faixas = {

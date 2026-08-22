@@ -114,7 +114,7 @@ export interface SolicitacaoDesconto {
   id: string;
   dataHoraSolicitacao: string; // ISO string
   cliente: string;
-  supervisora: 'Débora Rodrigues' | 'Marília Farias' | 'Gerência (Heder Santos)' | string;
+  supervisora: 'Débora Rodrigues' | 'Gerência (Heder Santos)' | string;
   consultor: string;
   placa: string;
   tipoDesconto: TipoDesconto;
@@ -160,8 +160,33 @@ export interface BudgetState {
   tetoTotalDepartamento: number; // R$ 900,00
   reservaGerente: number; // R$ 100,00
   gerente?: BudgetManager;
-  debora: BudgetSupervisor; // R$ 400,00 base
-  marilia: BudgetSupervisor; // R$ 400,00 base
+  debora: BudgetSupervisor; // R$ 800,00 base unificada
+  marilia?: BudgetSupervisor; // retrocompatibilidade
   ciclo: BudgetCycleInfo;
+}
+
+/**
+ * =====================================================================
+ * TIPOS PARA BACKUP, PONTO DE RESTAURAÇÃO E RESET SEGURO DO BANCO
+ * =====================================================================
+ */
+export interface PontoRestauracao {
+  id: string; // Ex: "ponto-20260822-145000"
+  dataHora: string; // ISO string
+  titulo: string; // Ex: "Ponto Automático pré-Reset Geral"
+  motivo: 'pre_reset' | 'manual' | 'agendado';
+  autor: string; // Ex: "Heder Santos (Administrador)"
+  contagem: {
+    ocorrencias: number;
+    passagens: number;
+    solicitacoesDesconto: number;
+    totalRegistros: number;
+  };
+  dados: {
+    ocorrencias: Ocorrencia[];
+    passagens: ResumoPassagem[];
+    solicitacoesDesconto: SolicitacaoDesconto[];
+  };
+  scriptSql: string; // Script SQL com regras nativas para recriação e restauração direta no Supabase
 }
 

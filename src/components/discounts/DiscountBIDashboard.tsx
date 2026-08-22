@@ -364,7 +364,9 @@ export const DiscountBIDashboard: React.FC<DiscountBIDashboardProps> = React.mem
                     name === 'ritmoIdeal' ? 'Ritmo Sustentável Ideal' : name;
                   return [`R$ ${Number(value).toFixed(2).replace('.', ',')}`, labelNome];
                 }}
-                contentStyle={{ backgroundColor: '#1e293b', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
+                contentStyle={{ backgroundColor: '#1e293b', borderRadius: '8px', border: '1px solid #334155', color: '#fff', fontSize: '12px' }}
+                labelStyle={{ color: '#ffffff', fontWeight: 'bold', marginBottom: '4px' }}
+                itemStyle={{ color: '#4ade80', fontWeight: 'bold' }}
               />
               
               {/* Linha de Teto Máximo R$ 900 */}
@@ -468,9 +470,8 @@ export const DiscountBIDashboard: React.FC<DiscountBIDashboardProps> = React.mem
                   onChange={(e) => setFiltroSupervisora(e.target.value)}
                   className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#005b2e]"
                 >
-                  <option value="Todas">Todas Supervisoras</option>
-                  <option value="Débora Rodrigues">Equipe Débora</option>
-                  <option value="Marília Farias">Equipe Marília</option>
+                  <option value="Todas">Todos os Consultores</option>
+                  <option value="Débora Rodrigues">Equipe Débora Rodrigues</option>
                 </select>
               </div>
             </div>
@@ -722,7 +723,12 @@ export const DiscountBIDashboard: React.FC<DiscountBIDashboardProps> = React.mem
                       <Cell key={`cell-vol-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderRadius: '8px', color: '#fff', fontSize: '12px' }} />
+                  <Tooltip 
+                    formatter={(val: any, name: string) => [`${val} solicitações`, name]}
+                    contentStyle={{ backgroundColor: '#1e293b', borderRadius: '8px', border: '1px solid #334155', color: '#fff', fontSize: '12px' }} 
+                    labelStyle={{ color: '#ffffff', fontWeight: 'bold', marginBottom: '4px' }}
+                    itemStyle={{ color: '#4ade80', fontWeight: 'bold' }}
+                  />
                   <Legend verticalAlign="bottom" height={36} iconType="circle" />
                 </PieChart>
               </ResponsiveContainer>
@@ -752,12 +758,14 @@ export const DiscountBIDashboard: React.FC<DiscountBIDashboardProps> = React.mem
                     label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
                   >
                     {analiseConversao.dadosPizzaFinanceiro.map((entry, index) => (
-                      <Cell key={`cell-fin-${index}`} fill={entry.color} />
+                       <Cell key={`cell-fin-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
                   <Tooltip 
-                    formatter={(val) => [`R$ ${Number(val).toFixed(2).replace('.', ',')}`, 'Renúncia']}
-                    contentStyle={{ backgroundColor: '#1e293b', borderRadius: '8px', color: '#fff', fontSize: '12px' }} 
+                    formatter={(val: any, name: string) => [`R$ ${Number(val).toFixed(2).replace('.', ',')}`, name || 'Renúncia']}
+                    contentStyle={{ backgroundColor: '#1e293b', borderRadius: '8px', border: '1px solid #334155', color: '#fff', fontSize: '12px' }} 
+                    labelStyle={{ color: '#ffffff', fontWeight: 'bold', marginBottom: '4px' }}
+                    itemStyle={{ color: '#4ade80', fontWeight: 'bold' }}
                   />
                   <Legend verticalAlign="bottom" height={36} iconType="circle" />
                 </PieChart>

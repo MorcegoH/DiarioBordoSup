@@ -6,7 +6,7 @@
 
 import React, { useState } from 'react';
 import { SolicitacaoDesconto } from '../../types';
-import { verifyAdminAuthorization, verificarSenhaGerente, sanitizeTextInput } from '../../utils/security';
+import { verifyApprovalAuthorization, sanitizeTextInput } from '../../utils/security';
 import { ShieldCheck, Lock, CheckCircle2, AlertTriangle, X, Eye, EyeOff } from 'lucide-react';
 
 interface ApprovalModalProps {
@@ -34,11 +34,11 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = React.memo(({
     setErroSenha(null);
 
     const trimmedPass = senhaInput.trim();
-    // Aceita a senha mestra ou senhas de demonstração gerenciais
-    const isSenhaValida = verificarSenhaGerente(trimmedPass);
+    // Valida a senha específica e exclusiva de aprovação de descontos (via Hash SHA-256 seguro)
+    const isSenhaValida = verifyApprovalAuthorization(trimmedPass);
 
     if (!isSenhaValida) {
-      setErroSenha('Senha de Segurança incorreta! Insira a senha autorizada do Gerente Heder Santos.');
+      setErroSenha('Senha de Segurança incorreta! Insira a senha autorizada para aprovação de descontos.');
       return;
     }
 

@@ -165,7 +165,6 @@ export const OccurrenceForm: React.FC<OccurrenceFormProps> = React.memo(({
             >
               <option value="Heder Santos">Heder Santos (Gerente de Vendas)</option>
               <option value="Debora Rodrigues">Debora Rodrigues (Supervisora)</option>
-              <option value="Marilia Farias">Marilia Farias (Supervisora)</option>
             </select>
           </div>
 

@@ -50,7 +50,7 @@ function mapSolicitacaoFromDB(row: any): SolicitacaoDesconto {
 /**
  * Mapeador de TypeScript para linha do Banco de Dados
  */
-function mapSolicitacaoToDB(item: SolicitacaoDesconto) {
+export function mapSolicitacaoToDB(item: SolicitacaoDesconto) {
   const dataRef = item.dataHoraSolicitacao || new Date().toISOString();
   return {
     id: item.id,
@@ -374,8 +374,6 @@ class DiscountService {
 
     let deboraGasto = 0;
     let deboraPendente = 0;
-    let mariliaGasto = 0;
-    let mariliaPendente = 0;
     let gerenteGasto = 0;
 
     solicitacoes.forEach((item) => {
@@ -387,32 +385,26 @@ class DiscountService {
       }
 
       const valor = item.valorDescontoCalculado || 0;
-      const isDebora = item.supervisora.includes('Débora') || item.supervisora.includes('Debora');
-      const isMarilia = item.supervisora.includes('Marília') || item.supervisora.includes('Marilia');
       const isGerencia = item.supervisora.includes('Gerência') || item.tipoRegistro === 'LiberacaoGerencial';
 
       if (item.status === 'Aprovado') {
-        if (isGerencia && !isDebora && !isMarilia) {
+        if (isGerencia || item.tipoRegistro === 'LiberacaoGerencial') {
           gerenteGasto += valor;
-        } else if (item.tipoRegistro === 'LiberacaoGerencial') {
-          gerenteGasto += valor;
-        } else if (isDebora) {
+        } else {
+          // Todas as solicitações de equipe ficam sob a supervisão unificada Débora
           deboraGasto += valor;
-        } else if (isMarilia) {
-          mariliaGasto += valor;
         }
       } else if (item.status === 'Aguardando Aprovação') {
-        if (isDebora) deboraPendente += valor;
-        else if (isMarilia) mariliaPendente += valor;
+        if (!isGerencia) {
+          deboraPendente += valor;
+        }
       }
     });
 
-    const deboraTeto = BUDGET_LIMITS.tetoSupervisoras['Débora Rodrigues'];
-    const mariliaTeto = BUDGET_LIMITS.tetoSupervisoras['Marília Farias'];
+    const deboraTeto = BUDGET_LIMITS.tetoSupervisoras['Débora Rodrigues'] || 700.0;
     const gerenteTeto = BUDGET_LIMITS.reservaGerente;
 
     const deboraSaldo = Math.max(0, deboraTeto - deboraGasto);
-    const mariliaSaldo = Math.max(0, mariliaTeto - mariliaGasto);
     const gerenteSaldo = Math.max(0, gerenteTeto - gerenteGasto);
 
     return {
@@ -430,10 +422,10 @@ class DiscountService {
         totalPendente: deboraPendente
       },
       marilia: {
-        tetoMensal: mariliaTeto,
-        totalUtilizado: mariliaGasto,
-        saldoDisponivel: mariliaSaldo,
-        totalPendente: mariliaPendente
+        tetoMensal: 0,
+        totalUtilizado: 0,
+        saldoDisponivel: 0,
+        totalPendente: 0
       },
       ciclo
     };

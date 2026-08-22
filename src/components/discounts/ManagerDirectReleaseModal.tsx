@@ -7,7 +7,7 @@
 import React, { useState, useMemo } from 'react';
 import { SolicitacaoDesconto, TipoDesconto, BudgetCycleInfo } from '../../types';
 import { HIERARQUIA_EQUIPES, validarPlacaVeiculo } from '../../data/discountData';
-import { verificarSenhaGerente, sanitizeTextInput } from '../../utils/security';
+import { verifyApprovalAuthorization, sanitizeTextInput } from '../../utils/security';
 import { 
   calcularDescontoAdesao, 
   calcularDescontoPlano, 
@@ -40,11 +40,11 @@ export const ManagerDirectReleaseModal: React.FC<ManagerDirectReleaseModalProps>
   isOpen,
   onClose,
   onConfirmRegistro,
-  saldoReservaGerente = 100.0,
+  saldoReservaGerente = 200.0,
   ciclo
 }) => {
-  const [supervisora, setSupervisora] = useState<'Débora Rodrigues' | 'Marília Farias'>('Débora Rodrigues');
-  const [consultor, setConsultor] = useState<string>(HIERARQUIA_EQUIPES.supervisoras['Débora Rodrigues'][0] || 'Erick');
+  const [supervisora, setSupervisora] = useState<'Débora Rodrigues'>('Débora Rodrigues');
+  const [consultor, setConsultor] = useState<string>(HIERARQUIA_EQUIPES.supervisoras['Débora Rodrigues'][0] || 'Aila');
   const [cliente, setCliente] = useState<string>('');
   const [placaInput, setPlacaInput] = useState<string>('');
   const [tipoDesconto, setTipoDesconto] = useState<TipoDesconto>('Adesão');
@@ -69,19 +69,10 @@ export const ManagerDirectReleaseModal: React.FC<ManagerDirectReleaseModalProps>
     senha?: string;
   }>({});
 
-  // Lista de consultores baseada na supervisora selecionada
+  // Lista de consultores da equipe unificada
   const consultoresDisponiveis = useMemo(() => {
-    return HIERARQUIA_EQUIPES.supervisoras[supervisora] || [];
-  }, [supervisora]);
-
-  // Atualiza consultor padrão ao trocar supervisora
-  const handleSupervisoraChange = (novaSupervisora: 'Débora Rodrigues' | 'Marília Farias') => {
-    setSupervisora(novaSupervisora);
-    const consultores = HIERARQUIA_EQUIPES.supervisoras[novaSupervisora] || [];
-    if (consultores.length > 0) {
-      setConsultor(consultores[0]);
-    }
-  };
+    return HIERARQUIA_EQUIPES.supervisoras['Débora Rodrigues'] || [];
+  }, []);
 
   // Validação da placa
   const validacaoPlaca = useMemo(() => {
@@ -163,8 +154,8 @@ export const ManagerDirectReleaseModal: React.FC<ManagerDirectReleaseModalProps>
       return;
     }
 
-    // Validação de senha gerencial
-    if (!verificarSenhaGerente(senha)) {
+    // Validação de senha de autorização/aprovação gerencial
+    if (!verifyApprovalAuthorization(senha)) {
       setErroSenha('Senha de Segurança incorreta. Liberação não autorizada pelo Gerente Heder Santos.');
       return;
     }
@@ -265,7 +256,7 @@ export const ManagerDirectReleaseModal: React.FC<ManagerDirectReleaseModalProps>
               <div>
                 <span className="font-bold text-sm block">Teto Máximo do Gerente Esgotado</span>
                 <p className="mt-0.5 text-red-800">
-                  O gerente <strong>Heder Santos</strong> já liberou seu teto máximo mensal de <strong>R$ 100,00</strong> para {ciclo ? ciclo.mesCurto : 'este mês'}. A reserva de contingência gerencial <strong>não está mais disponível</strong> para novas concessões neste ciclo (próxima liberação em {ciclo?.dataProximaRenovacao || 'próximo dia 01'}).
+                  O gerente <strong>Heder Santos</strong> já liberou seu teto máximo mensal de <strong>R$ 200,00</strong> para {ciclo ? ciclo.mesCurto : 'este mês'}. A reserva de contingência gerencial <strong>não está mais disponível</strong> para novas concessões neste ciclo (próxima liberação em {ciclo?.dataProximaRenovacao || 'próximo dia 01'}).
                 </p>
               </div>
             </div>
@@ -294,11 +285,10 @@ export const ManagerDirectReleaseModal: React.FC<ManagerDirectReleaseModalProps>
               </label>
               <select
                 value={supervisora}
-                onChange={(e) => handleSupervisoraChange(e.target.value as 'Débora Rodrigues' | 'Marília Farias')}
-                className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 bg-white font-semibold focus:ring-2 focus:ring-[#005b2e] focus:border-[#005b2e]"
+                disabled
+                className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 bg-gray-100 font-semibold text-gray-800 cursor-not-allowed"
               >
-                <option value="Débora Rodrigues">Equipe Débora Rodrigues</option>
-                <option value="Marília Farias">Equipe Marília Farias</option>
+                <option value="Débora Rodrigues">Equipe Débora Rodrigues (Supervisão Unificada)</option>
               </select>
             </div>
 
@@ -309,7 +299,7 @@ export const ManagerDirectReleaseModal: React.FC<ManagerDirectReleaseModalProps>
               <select
                 value={consultor}
                 onChange={(e) => setConsultor(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 bg-white font-semibold focus:ring-2 focus:ring-[#005b2e] focus:border-[#005b2e]"
+                className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 bg-white font-semibold focus:ring-2 focus:ring-[#005b2e] focus:border-[#005b2e] cursor-pointer"
               >
                 {consultoresDisponiveis.map((c) => (
                   <option key={c} value={c}>

@@ -9,23 +9,21 @@ export const HIERARQUIA_EQUIPES = {
   gerente: 'Heder Santos',
   supervisoras: {
     'Débora Rodrigues': [
+      'Aila',
       'Auryane',
       'Charlene',
       'Erick',
       'Everton',
-      'Hevely',
-      'Rute',
-      'Thalia'
-    ],
-    'Marília Farias': [
-      'Aila',
       'Felipe',
       'Gabriela',
+      'Hevely',
       'Hillary',
       'Kelvin',
-      'Roney',
+      'Kelvyn',
       'Naderson',
-      'Kelvyn'
+      'Roney',
+      'Rute',
+      'Thalia'
     ]
   }
 } as const;
@@ -33,10 +31,9 @@ export const HIERARQUIA_EQUIPES = {
 export const BUDGET_LIMITS = {
   tetoTotalDepartamento: 900.0,
   tetoSupervisoras: {
-    'Débora Rodrigues': 400.0,
-    'Marília Farias': 400.0
+    'Débora Rodrigues': 700.0
   },
-  reservaGerente: 100.0,
+  reservaGerente: 200.0,
   tetoMaximoPercentualDesconto: 20.0, // 20%
   valorAdesaoPadrao: 200.0 // R$ 200,00
 } as const;

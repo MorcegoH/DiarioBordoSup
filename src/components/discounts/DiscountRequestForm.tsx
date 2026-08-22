@@ -42,7 +42,7 @@ export const DiscountRequestForm: React.FC<DiscountRequestFormProps> = React.mem
 }) => {
   // Estados do Formulário
   const [cliente, setCliente] = useState<string>('');
-  const [supervisora, setSupervisora] = useState<'Débora Rodrigues' | 'Marília Farias'>('Débora Rodrigues');
+  const [supervisora, setSupervisora] = useState<'Débora Rodrigues'>('Débora Rodrigues');
   const [consultor, setConsultor] = useState<string>('');
   const [placaInput, setPlacaInput] = useState<string>('');
   const [tipoDesconto, setTipoDesconto] = useState<TipoDesconto>('Adesão');
@@ -55,17 +55,17 @@ export const DiscountRequestForm: React.FC<DiscountRequestFormProps> = React.mem
   
   const [feedbackSucesso, setFeedbackSucesso] = useState<string | null>(null);
 
-  // Lista de consultores baseada na supervisora selecionada
+  // Lista de consultores baseada na supervisora selecionada (Equipe Unificada)
   const listaConsultores = useMemo(() => {
-    return HIERARQUIA_EQUIPES.supervisoras[supervisora] || [];
-  }, [supervisora]);
+    return HIERARQUIA_EQUIPES.supervisoras['Débora Rodrigues'] || [];
+  }, []);
 
-  // Atualizar consultor padrão ao trocar supervisora
+  // Atualizar consultor padrão ao inicializar
   useEffect(() => {
-    if (listaConsultores.length > 0) {
+    if (listaConsultores.length > 0 && !consultor) {
       setConsultor(listaConsultores[0]);
     }
-  }, [supervisora, listaConsultores]);
+  }, [listaConsultores, consultor]);
 
   // Validação da Placa
   const validacaoPlaca = useMemo(() => {
@@ -87,13 +87,10 @@ export const DiscountRequestForm: React.FC<DiscountRequestFormProps> = React.mem
     }
   }, [tipoDesconto, valorCheioPlano, descontoValorAdesao, descontoPercentualPlano]);
 
-  // Validação de Trava de Orçamento da Supervisora
+  // Validação de Trava de Orçamento da Supervisora Débora (Unificada)
   const saldoSupervisoraAtual = useMemo(() => {
-    if (supervisora === 'Débora Rodrigues') {
-      return budget.debora.saldoDisponivel;
-    }
-    return budget.marilia.saldoDisponivel;
-  }, [supervisora, budget]);
+    return budget.debora.saldoDisponivel;
+  }, [budget]);
 
   const saldoInsuficiente = useMemo(() => {
     if (saldoSupervisoraAtual <= 0) return true;
@@ -372,14 +369,11 @@ export const DiscountRequestForm: React.FC<DiscountRequestFormProps> = React.mem
             </label>
             <select
               value={supervisora}
-              onChange={(e) => setSupervisora(e.target.value as 'Débora Rodrigues' | 'Marília Farias')}
+              onChange={(e) => setSupervisora(e.target.value as 'Débora Rodrigues')}
               className="w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#005b2e] focus:border-[#005b2e] transition-all text-gray-800 font-semibold cursor-pointer"
             >
               <option value="Débora Rodrigues">
-                Débora Rodrigues — Saldo: R$ {budget.debora.saldoDisponivel.toFixed(2).replace('.', ',')} (Teto: R$ 400,00/mês)
-              </option>
-              <option value="Marília Farias">
-                Marília Farias — Saldo: R$ {budget.marilia.saldoDisponivel.toFixed(2).replace('.', ',')} (Teto: R$ 400,00/mês)
+                Débora Rodrigues — Saldo: R$ {budget.debora.saldoDisponivel.toFixed(2).replace('.', ',')} (Teto: R$ 800,00/mês)
               </option>
             </select>
           </div>
@@ -392,7 +386,7 @@ export const DiscountRequestForm: React.FC<DiscountRequestFormProps> = React.mem
                 Consultor de Vendas (Inside Sales) *
               </span>
               <span className="text-[10px] text-gray-500 font-normal">
-                Time {supervisora.split(' ')[0]} ({listaConsultores.length} consultores)
+                Supervisão Débora ({listaConsultores.length} consultores)
               </span>
             </label>
             <select
@@ -402,7 +396,7 @@ export const DiscountRequestForm: React.FC<DiscountRequestFormProps> = React.mem
             >
               {listaConsultores.map((nome) => (
                 <option key={nome} value={nome}>
-                  {nome} (Inside Sales - Time {supervisora.split(' ')[0]})
+                  {nome} (Inside Sales)
                 </option>
               ))}
             </select>

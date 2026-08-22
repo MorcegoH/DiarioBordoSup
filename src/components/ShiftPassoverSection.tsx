@@ -446,7 +446,6 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
               >
                 <option value="Heder Santos">Heder Santos (Gerente de Vendas)</option>
                 <option value="Debora Rodrigues">Debora Rodrigues (Supervisora)</option>
-                <option value="Marilia Farias">Marilia Farias (Supervisora)</option>
               </select>
             </div>
 
@@ -646,8 +645,7 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
             >
               <option value="">Liderança</option>
               <option value="Heder Santos">Heder Santos (Gerente)</option>
-              <option value="Debora Rodrigues">Debora Rodrigues</option>
-              <option value="Marilia Farias">Marilia Farias</option>
+              <option value="Debora Rodrigues">Debora Rodrigues (Supervisora)</option>
             </select>
           </div>
         </div>
@@ -1107,7 +1105,6 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
                         >
                           <option value="Heder Santos">Heder Santos (Gerente de Vendas)</option>
                           <option value="Debora Rodrigues">Debora Rodrigues (Supervisora)</option>
-                          <option value="Marilia Farias">Marilia Farias (Supervisora)</option>
                         </select>
                       </div>
 
@@ -1258,7 +1255,6 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
                 >
                   <option value="Heder Santos">Heder Santos (Gerente de Vendas)</option>
                   <option value="Debora Rodrigues">Debora Rodrigues (Supervisora)</option>
-                  <option value="Marilia Farias">Marilia Farias (Supervisora)</option>
                 </select>
               </div>
 
@@ -1342,7 +1338,6 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
                 >
                   <option value="Heder Santos">Heder Santos (Gerente de Vendas)</option>
                   <option value="Debora Rodrigues">Debora Rodrigues (Supervisora)</option>
-                  <option value="Marilia Farias">Marilia Farias (Supervisora)</option>
                 </select>
               </div>
 

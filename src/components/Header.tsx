@@ -82,9 +82,9 @@ export const Header: React.FC<HeaderProps> = React.memo(({
   }, []);
 
   return (
-    <header className="bg-primary-green text-white shadow-md border-b border-green-900">
+    <header className="bg-primary-green text-white shadow-md border-b border-green-900 w-full">
       {/* Top Banner */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div className="w-full max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-4">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           
           {/* Title & Brand */}
@@ -194,14 +194,14 @@ export const Header: React.FC<HeaderProps> = React.memo(({
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <nav className="flex overflow-x-auto space-x-1 sm:space-x-2 mt-5 pt-2 border-t border-emerald-700/60 no-scrollbar">
+        {/* Navigation Tabs - Estilo App com suporte a touch e rolagem suave */}
+        <nav className="flex overflow-x-auto space-x-2 mt-4 pt-2 border-t border-emerald-700/60 no-scrollbar touch-pan-x py-1">
           <button
             onClick={() => setActiveTab('ocorrencias')}
-            className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-lg transition-all whitespace-nowrap cursor-pointer ${
+            className={`flex items-center space-x-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 select-none ${
               activeTab === 'ocorrencias'
-                ? 'bg-white text-[#005b2e] shadow-sm font-semibold'
-                : 'text-emerald-100 hover:bg-emerald-800/60 hover:text-white'
+                ? 'bg-white text-[#005b2e] shadow-sm font-bold ring-2 ring-white/30'
+                : 'text-emerald-100 bg-white/5 hover:bg-emerald-800/60 hover:text-white'
             }`}
           >
             <ClipboardList className="w-4 h-4" />
@@ -210,10 +210,10 @@ export const Header: React.FC<HeaderProps> = React.memo(({
 
           <button
             onClick={() => setActiveTab('descontos')}
-            className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-lg transition-all whitespace-nowrap cursor-pointer ${
+            className={`flex items-center space-x-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 select-none ${
               activeTab === 'descontos'
-                ? 'bg-white text-[#005b2e] shadow-sm font-semibold'
-                : 'text-emerald-100 hover:bg-emerald-800/60 hover:text-white'
+                ? 'bg-white text-[#005b2e] shadow-sm font-bold ring-2 ring-white/30'
+                : 'text-emerald-100 bg-white/5 hover:bg-emerald-800/60 hover:text-white'
             }`}
           >
             <BadgePercent className="w-4 h-4" />
@@ -222,10 +222,10 @@ export const Header: React.FC<HeaderProps> = React.memo(({
 
           <button
             onClick={() => setActiveTab('dashboard')}
-            className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-lg transition-all whitespace-nowrap cursor-pointer ${
+            className={`flex items-center space-x-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 select-none ${
               activeTab === 'dashboard'
-                ? 'bg-white text-[#005b2e] shadow-sm font-semibold'
-                : 'text-emerald-100 hover:bg-emerald-800/60 hover:text-white'
+                ? 'bg-white text-[#005b2e] shadow-sm font-bold ring-2 ring-white/30'
+                : 'text-emerald-100 bg-white/5 hover:bg-emerald-800/60 hover:text-white'
             }`}
           >
             <BarChart3 className="w-4 h-4" />
@@ -234,10 +234,10 @@ export const Header: React.FC<HeaderProps> = React.memo(({
 
           <button
             onClick={() => setActiveTab('passagem')}
-            className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-lg transition-all whitespace-nowrap cursor-pointer ${
+            className={`flex items-center space-x-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 select-none ${
               activeTab === 'passagem'
-                ? 'bg-white text-[#005b2e] shadow-sm font-semibold'
-                : 'text-emerald-100 hover:bg-emerald-800/60 hover:text-white'
+                ? 'bg-white text-[#005b2e] shadow-sm font-bold ring-2 ring-white/30'
+                : 'text-emerald-100 bg-white/5 hover:bg-emerald-800/60 hover:text-white'
             }`}
           >
             <Sparkles className="w-4 h-4" />
@@ -246,13 +246,14 @@ export const Header: React.FC<HeaderProps> = React.memo(({
         </nav>
       </div>
 
-      {/* Modal de Erro do Banco de Dados (exibido quando acionado pelo usuário) */}
+      {/* Modal de Infraestrutura, Diagnóstico, Backup & Reset do Banco */}
       <DatabaseErrorModal
         isOpen={isErrorModalOpen}
         onClose={() => setIsErrorModalOpen(false)}
         healthStatus={healthStatus}
         onRetryConnection={handleRetryConnection}
         onSyncComplete={onDataSynced}
+        onDataResetOrRestored={onDataSynced}
       />
     </header>
   );

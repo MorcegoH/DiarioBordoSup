@@ -665,7 +665,9 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = React.memo(
                         `${value} horas (${Math.round(Number(value) * 60)} min)`,
                         'Impacto de Tempo'
                       ]}
-                      contentStyle={{ backgroundColor: '#1e293b', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
+                      contentStyle={{ backgroundColor: '#1e293b', borderRadius: '8px', border: '1px solid #334155', color: '#fff', fontSize: '12px' }}
+                      labelStyle={{ color: '#ffffff', fontWeight: 'bold', marginBottom: '4px' }}
+                      itemStyle={{ color: '#4ade80', fontWeight: 'bold' }}
                     />
                     <Bar dataKey="horasImpacto" name="Horas de Impacto" fill="#d97706" radius={[4, 4, 0, 0]}>
                       {chartDataTempoImpacto.map((entry, index) => (
@@ -800,7 +802,13 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = React.memo(
                     />
                     <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                     <Tooltip 
-                      contentStyle={{ backgroundColor: '#1e293b', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
+                      formatter={(value: any) => [
+                        `${value} ${Number(value) === 1 ? 'ocorrência' : 'ocorrências'}`,
+                        'Total'
+                      ]}
+                      contentStyle={{ backgroundColor: '#1e293b', borderRadius: '8px', border: '1px solid #334155', color: '#fff', fontSize: '12px' }}
+                      labelStyle={{ color: '#ffffff', fontWeight: 'bold', marginBottom: '4px' }}
+                      itemStyle={{ color: '#4ade80', fontWeight: 'bold' }}
                     />
                     <Bar dataKey="total" fill="#005b2e" radius={[4, 4, 0, 0]}>
                       {chartDataCategoria.map((entry, index) => (
@@ -860,7 +868,9 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = React.memo(
                             `${value} ${Number(value) === 1 ? 'ocorrência' : 'ocorrências'} (${resumoSeveridade.total > 0 ? Math.round((Number(value) / resumoSeveridade.total) * 100) : 0}%)`,
                             `Severidade: ${name}`
                           ]}
-                          contentStyle={{ backgroundColor: '#1e293b', borderRadius: '8px', color: '#fff', fontSize: '12px' }} 
+                          contentStyle={{ backgroundColor: '#1e293b', borderRadius: '8px', border: '1px solid #334155', color: '#fff', fontSize: '12px' }} 
+                          labelStyle={{ color: '#ffffff', fontWeight: 'bold', marginBottom: '4px' }}
+                          itemStyle={{ color: '#4ade80', fontWeight: 'bold' }}
                         />
                       </PieChart>
                     </ResponsiveContainer>

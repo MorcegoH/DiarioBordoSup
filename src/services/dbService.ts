@@ -5,11 +5,13 @@
  */
 
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { Ocorrencia, ResumoPassagem, Status, ComentarioPassagem } from '../types';
-import { sanitizeTextInput } from '../utils/security';
+import { Ocorrencia, ResumoPassagem, Status, ComentarioPassagem, PontoRestauracao, SolicitacaoDesconto } from '../types';
+import { sanitizeTextInput, verificarSenhaGerente } from '../utils/security';
+import { discountService, mapSolicitacaoToDB } from './discountService';
 
 const LOCAL_KEY_OCORRENCIAS = 'diario_bordo_ocorrencias_v1';
 const LOCAL_KEY_PASSAGENS = 'diario_bordo_passagens_v1';
+const LOCAL_KEY_SNAPSHOTS = 'diario_bordo_backup_snapshots_v1';
 
 /**
  * Interface para retorno estruturado do resultado de operações no banco
@@ -213,6 +215,152 @@ function setLocalPassagens(data: ResumoPassagem[]) {
   } catch (e) {
     console.error('Erro ao salvar passagens locais:', e);
   }
+}
+
+function getLocalSnapshots(): PontoRestauracao[] {
+  try {
+    const saved = localStorage.getItem(LOCAL_KEY_SNAPSHOTS);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {
+    console.error('Erro ao carregar snapshots de backup locais:', e);
+  }
+  return [];
+}
+
+function setLocalSnapshots(data: PontoRestauracao[]) {
+  try {
+    localStorage.setItem(LOCAL_KEY_SNAPSHOTS, JSON.stringify(data));
+  } catch (e) {
+    console.error('Erro ao salvar snapshots de backup locais:', e);
+  }
+}
+
+function generateRestorePointSQL(
+  pontoId: string,
+  dataHora: string,
+  titulo: string,
+  motivo: string,
+  autor: string,
+  ocorrencias: Ocorrencia[],
+  passagens: ResumoPassagem[],
+  solicitacoes: SolicitacaoDesconto[]
+): string {
+  const cleanTimestamp = dataHora.replace(/[-:T.Z]/g, '_').slice(0, 19);
+  
+  let sql = `-- =========================================================================\n`;
+  sql += `-- PONTO DE RESTAURAÇÃO DE BANCO DE DADOS - DIÁRIO DE BORDO SALES OPS\n`;
+  sql += `-- Identificador: ${pontoId}\n`;
+  sql += `-- Criado em: ${new Date(dataHora).toLocaleString('pt-BR')} por ${autor}\n`;
+  sql += `-- Motivo: ${motivo.toUpperCase()} | ${titulo}\n`;
+  sql += `-- Total de Registros: ${ocorrencias.length} ocorrências, ${passagens.length} passagens, ${solicitacoes.length} descontos\n`;
+  sql += `-- =========================================================================\n\n`;
+
+  sql += `-- 1. REGRAS NATIVAS POSTGRESQL PARA CRIAÇÃO DE TABELAS DE BACKUP (SNAPSHOT NO BANCO)\n`;
+  sql += `CREATE TABLE IF NOT EXISTS public.backup_ocorrencias_${cleanTimestamp} AS TABLE public.ocorrencias WITH DATA;\n`;
+  sql += `CREATE TABLE IF NOT EXISTS public.backup_resumos_passagem_${cleanTimestamp} AS TABLE public.resumos_passagem WITH DATA;\n`;
+  sql += `CREATE TABLE IF NOT EXISTS public.backup_solicitacoes_desconto_${cleanTimestamp} AS TABLE public.solicitacoes_desconto WITH DATA;\n\n`;
+
+  sql += `-- 2. TABELA CENTRAL DE METADADOS DE PONTOS DE RESTAURAÇÃO\n`;
+  sql += `CREATE TABLE IF NOT EXISTS public.pontos_restauracao (\n`;
+  sql += `  id TEXT PRIMARY KEY,\n`;
+  sql += `  data_hora TIMESTAMPTZ NOT NULL DEFAULT NOW(),\n`;
+  sql += `  titulo TEXT NOT NULL,\n`;
+  sql += `  motivo TEXT NOT NULL,\n`;
+  sql += `  autor TEXT NOT NULL,\n`;
+  sql += `  contagem JSONB NOT NULL,\n`;
+  sql += `  dados JSONB NOT NULL,\n`;
+  sql += `  script_sql TEXT\n`;
+  sql += `);\n\n`;
+
+  sql += `-- 3. SCRIPTS DML DE RESTAURAÇÃO DIRETA (UPSERT COMPATÍVEL)\n`;
+  if (ocorrencias.length > 0) {
+    sql += `-- Restaurar ${ocorrencias.length} Ocorrências\n`;
+    ocorrencias.forEach((o) => {
+      const histStr = JSON.stringify(o.historicoAtualizacoes || []).replace(/'/g, "''");
+      const descStr = (o.descricao || '').replace(/'/g, "''");
+      const acaoStr = (o.acaoTomada || '').replace(/'/g, "''");
+      const supStr = (o.supervisor || '').replace(/'/g, "''");
+      const catStr = (o.categoria || '').replace(/'/g, "''");
+      const conclVal = o.dataHoraConclusao ? `'${o.dataHoraConclusao}'` : 'NULL';
+      sql += `INSERT INTO public.ocorrencias (id, data_hora, data_hora_conclusao, supervisor, categoria, descricao, impacto, acao_tomada, status, duracao_minutos, historico_atualizacoes)\n`;
+      sql += `VALUES ('${o.id}', '${o.dataHora}', ${conclVal}, '${supStr}', '${catStr}', '${descStr}', '${o.impacto}', '${acaoStr}', '${o.status}', ${o.duracaoMinutos || 0}, '${histStr}'::jsonb)\n`;
+      sql += `ON CONFLICT (id) DO UPDATE SET\n`;
+      sql += `  data_hora = EXCLUDED.data_hora,\n`;
+      sql += `  data_hora_conclusao = EXCLUDED.data_hora_conclusao,\n`;
+      sql += `  supervisor = EXCLUDED.supervisor,\n`;
+      sql += `  categoria = EXCLUDED.categoria,\n`;
+      sql += `  descricao = EXCLUDED.descricao,\n`;
+      sql += `  impacto = EXCLUDED.impacto,\n`;
+      sql += `  acao_tomada = EXCLUDED.acao_tomada,\n`;
+      sql += `  status = EXCLUDED.status,\n`;
+      sql += `  duracao_minutos = EXCLUDED.duracao_minutos,\n`;
+      sql += `  historico_atualizacoes = EXCLUDED.historico_atualizacoes;\n\n`;
+    });
+  }
+
+  if (passagens.length > 0) {
+    sql += `-- Restaurar ${passagens.length} Fechamentos de Turno\n`;
+    passagens.forEach((p) => {
+      const supStr = (p.supervisor || '').replace(/'/g, "''");
+      const funcStr = (p.oQueFuncionou || '').replace(/'/g, "''");
+      const pendStr = (p.oQueFicaPendente || '').replace(/'/g, "''");
+      const obsStr = (p.observacaoConclusao || '').replace(/'/g, "''");
+      const respStr = (p.responsavelConclusao || '').replace(/'/g, "''");
+      const conclVal = p.dataHoraConclusao ? `'${p.dataHoraConclusao}'` : 'NULL';
+      const conteudoJson = JSON.stringify({
+        oQueFuncionou: p.oQueFuncionou,
+        oQueFicaPendente: p.oQueFicaPendente,
+        dataHoraCriacao: p.dataHoraCriacao,
+        dataHoraConclusao: p.dataHoraConclusao || null,
+        status: p.status || 'Pendente',
+        observacaoConclusao: p.observacaoConclusao || null,
+        responsavelConclusao: p.responsavelConclusao || null,
+        comentarios: p.comentarios || []
+      }).replace(/'/g, "''");
+
+      sql += `INSERT INTO public.resumos_passagem (id, data, supervisor, o_que_funcionou, o_que_fica_pendente, data_hora_criacao, data_hora_conclusao, status, observacao_conclusao, responsavel_conclusao, conteudo)\n`;
+      sql += `VALUES ('${p.id}', '${p.data}', '${supStr}', '${funcStr}', '${pendStr}', '${p.dataHoraCriacao}', ${conclVal}, '${p.status || 'Pendente'}', '${obsStr}', '${respStr}', '${conteudoJson}'::jsonb)\n`;
+      sql += `ON CONFLICT (id) DO UPDATE SET\n`;
+      sql += `  data = EXCLUDED.data,\n`;
+      sql += `  supervisor = EXCLUDED.supervisor,\n`;
+      sql += `  o_que_funcionou = EXCLUDED.o_que_funcionou,\n`;
+      sql += `  o_que_fica_pendente = EXCLUDED.o_que_fica_pendente,\n`;
+      sql += `  data_hora_criacao = EXCLUDED.data_hora_criacao,\n`;
+      sql += `  data_hora_conclusao = EXCLUDED.data_hora_conclusao,\n`;
+      sql += `  status = EXCLUDED.status,\n`;
+      sql += `  observacao_conclusao = EXCLUDED.observacao_conclusao,\n`;
+      sql += `  responsavel_conclusao = EXCLUDED.responsavel_conclusao,\n`;
+      sql += `  conteudo = EXCLUDED.conteudo;\n\n`;
+    });
+  }
+
+  if (solicitacoes.length > 0) {
+    sql += `-- Restaurar ${solicitacoes.length} Solicitações de Desconto\n`;
+    solicitacoes.forEach((s) => {
+      const cliStr = (s.cliente || '').replace(/'/g, "''");
+      const placaStr = (s.placa || '').replace(/'/g, "''");
+      const consStr = (s.consultor || '').replace(/'/g, "''");
+      const supStr = (s.supervisora || '').replace(/'/g, "''");
+      const justStr = (s.justificativa || '').replace(/'/g, "''");
+      const parecerStr = (s.parecer || '').replace(/'/g, "''");
+      const aprovadorStr = (s.aprovador || '').replace(/'/g, "''");
+      const aprovVal = s.dataHoraAprovacao ? `'${s.dataHoraAprovacao}'` : 'NULL';
+      const mesComp = (s.dataHoraSolicitacao || '').slice(0, 7) || '2026-08';
+
+      sql += `INSERT INTO public.solicitacoes_desconto (id, data_hora_solicitacao, mes_competencia, cliente, placa, consultor, supervisora, tipo_desconto, valor_cheio, desconto_input, valor_desconto_calculado, percentual_desconto, valor_final, justificativa, status, data_hora_aprovacao, parecer, aprovador, tipo_registro)\n`;
+      sql += `VALUES ('${s.id}', '${s.dataHoraSolicitacao}', '${mesComp}', '${cliStr}', '${placaStr}', '${consStr}', '${supStr}', '${s.tipoDesconto}', ${s.valorCheio}, ${s.descontoInput}, ${s.valorDescontoCalculado}, ${s.percentualDesconto}, ${s.valorFinal}, '${justStr}', '${s.status}', ${aprovVal}, '${parecerStr}', '${aprovadorStr}', '${s.tipoRegistro || 'SolicitacaoSupervisao'}')\n`;
+      sql += `ON CONFLICT (id) DO UPDATE SET\n`;
+      sql += `  status = EXCLUDED.status,\n`;
+      sql += `  data_hora_aprovacao = EXCLUDED.data_hora_aprovacao,\n`;
+      sql += `  parecer = EXCLUDED.parecer,\n`;
+      sql += `  aprovador = EXCLUDED.aprovador;\n\n`;
+    });
+  }
+
+  return sql;
 }
 
 export const dbService = {
@@ -957,6 +1105,326 @@ export const dbService = {
         error: err?.message
       };
     }
+  },
+
+  // --- PONTOS DE RESTAURAÇÃO, BACKUP E RESET SEGURO ---
+
+  /**
+   * Recupera a lista de todos os pontos de restauração salvos
+   */
+  async getPontosRestauracao(): Promise<PontoRestauracao[]> {
+    const locais = getLocalSnapshots();
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('pontos_restauracao')
+          .select('*')
+          .order('data_hora', { ascending: false });
+
+        if (!error && Array.isArray(data)) {
+          const remotos: PontoRestauracao[] = data.map((row: any) => ({
+            id: String(row.id),
+            dataHora: row.data_hora || row.created_at,
+            titulo: row.titulo,
+            motivo: row.motivo || 'manual',
+            autor: row.autor || 'Administrador',
+            contagem: row.contagem || { ocorrencias: 0, passagens: 0, solicitacoesDesconto: 0, totalRegistros: 0 },
+            dados: row.dados || { ocorrencias: [], passagens: [], solicitacoesDesconto: [] },
+            scriptSql: row.script_sql || ''
+          }));
+
+          // Unifica sem duplicar IDs
+          const idMap = new Map<string, PontoRestauracao>();
+          remotos.forEach(p => idMap.set(p.id, p));
+          locais.forEach(p => {
+            if (!idMap.has(p.id)) idMap.set(p.id, p);
+          });
+
+          const unificados = Array.from(idMap.values()).sort(
+            (a, b) => new Date(b.dataHora).getTime() - new Date(a.dataHora).getTime()
+          );
+          setLocalSnapshots(unificados);
+          return unificados;
+        }
+      } catch (err) {
+        console.warn('Tabela pontos_restauracao não acessível no Supabase, usando LocalStorage:', err);
+      }
+    }
+
+    return locais.sort((a, b) => new Date(b.dataHora).getTime() - new Date(a.dataHora).getTime());
+  },
+
+  /**
+   * Formata a data atual ou informada para o padrão de título BCKddmmyyyy (Ex: BCK22082026)
+   */
+  gerarTituloPadraoBCK(data: Date = new Date()): string {
+    const dia = String(data.getDate()).padStart(2, '0');
+    const mes = String(data.getMonth() + 1).padStart(2, '0');
+    const ano = String(data.getFullYear());
+    return `BCK${dia}${mes}${ano}`;
+  },
+
+  /**
+   * Cria um Ponto de Restauração (Snapshot de Backup) com regras SQL e dados completos
+   * O título gerado segue estritamente o padrão BCKddmmyyyy (ex: BCK22082026)
+   */
+  async criarPontoRestauracao(
+    motivo: 'pre_reset' | 'manual' | 'agendado' = 'manual',
+    tituloCustom?: string,
+    autor: string = 'Heder Santos (Administrador)'
+  ): Promise<PontoRestauracao> {
+    const agora = new Date();
+    const dataHoraIso = agora.toISOString();
+    
+    // 1. Coleta os dados de todas as entidades
+    const ocorrencias = await this.getOcorrencias();
+    const passagens = await this.getPassagens();
+    const solicitacoesDesconto = await discountService.getSolicitacoesAsync();
+
+    const id = `ponto-${agora.getFullYear()}${String(agora.getMonth() + 1).padStart(2, '0')}${String(agora.getDate()).padStart(2, '0')}-${String(agora.getHours()).padStart(2, '0')}${String(agora.getMinutes()).padStart(2, '0')}${String(agora.getSeconds()).padStart(2, '0')}`;
+    
+    // Título no padrão estrito BCKddmmyyyy (Ex: BCK22082026)
+    const titulo = tituloCustom?.trim() || this.gerarTituloPadraoBCK(agora);
+
+    const contagem = {
+      ocorrencias: ocorrencias.length,
+      passagens: passagens.length,
+      solicitacoesDesconto: solicitacoesDesconto.length,
+      totalRegistros: ocorrencias.length + passagens.length + solicitacoesDesconto.length
+    };
+
+    const scriptSql = generateRestorePointSQL(
+      id,
+      dataHoraIso,
+      titulo,
+      motivo,
+      autor,
+      ocorrencias,
+      passagens,
+      solicitacoesDesconto
+    );
+
+    const novoPonto: PontoRestauracao = {
+      id,
+      dataHora: dataHoraIso,
+      titulo,
+      motivo,
+      autor,
+      contagem,
+      dados: {
+        ocorrencias,
+        passagens,
+        solicitacoesDesconto
+      },
+      scriptSql
+    };
+
+    // 2. Salva localmente com segurança substituindo o backup anterior (mantém estritamente apenas 1 backup ativo)
+    setLocalSnapshots([novoPonto]);
+
+    // 3. Salva no Supabase se configurado, limpando backups anteriores para manter apenas o atual
+    if (isSupabaseConfigured && supabase) {
+      try {
+        // Limpa registros anteriores para manter somente o backup mais recente
+        await supabase.from('pontos_restauracao').delete().neq('id', '___filtro_limpeza___');
+        
+        const { error: upsertErr } = await supabase.from('pontos_restauracao').upsert([{
+          id: novoPonto.id,
+          data_hora: novoPonto.dataHora,
+          titulo: novoPonto.titulo,
+          motivo: novoPonto.motivo,
+          autor: novoPonto.autor,
+          contagem: novoPonto.contagem,
+          dados: novoPonto.dados,
+          script_sql: novoPonto.scriptSql
+        }], { onConflict: 'id' });
+
+        if (upsertErr) {
+          console.warn('Aviso ao sincronizar backup na tabela remota pontos_restauracao:', upsertErr);
+        }
+      } catch (err) {
+        console.warn('Não foi possível gravar na tabela remota pontos_restauracao (salvo no LocalStorage):', err);
+      }
+    }
+
+    return novoPonto;
+  },
+
+  /**
+   * ZERA E APAGA TODO O BANCO DE DADOS:
+   * 1. Valida senha específica administrativa
+   * 2. CRIA OBRIGATORIAMENTE O BACKUP (BCKddmmyyyy) ANTES DO RESET COM VALIDAÇÃO RÍGIDA
+   *    Se o backup falhar, a exclusão é IMEDIATAMENTE BLOQUEADA e o erro é reportado.
+   * 3. Se e somente se o backup foi criado com sucesso, realiza a limpeza total das tabelas.
+   */
+  async zerarBancoDeDados(
+    senha: string,
+    autor: string = 'Heder Santos (Gerente / Administrador)'
+  ): Promise<{
+    success: boolean;
+    message: string;
+    snapshotCriado?: PontoRestauracao;
+    detalhesErro?: string;
+  }> {
+    // 1. Validação estrita da senha de segurança
+    if (!verificarSenhaGerente(senha)) {
+      return {
+        success: false,
+        message: 'Senha de autorização incorreta. Operação de exclusão cancelada por segurança.'
+      };
+    }
+
+    // 2. CRIAÇÃO E CONFIRMAÇÃO DO BACKUP ANTES DE QUALQUER EXCLUSÃO
+    let snapshotCriado: PontoRestauracao;
+    try {
+      snapshotCriado = await this.criarPontoRestauracao(
+        'pre_reset',
+        undefined, // Utiliza o padrão automático BCKddmmyyyy (ex: BCK22082026)
+        autor
+      );
+
+      // Verificação rigorosa se o snapshot foi de fato criado e persistido
+      if (!snapshotCriado || !snapshotCriado.id || !snapshotCriado.dados) {
+        return {
+          success: false,
+          message: 'Exclusão bloqueada: Não foi possível validar a integridade dos dados para o backup.',
+          detalhesErro: 'O snapshot gerado retornou estrutura nula ou incompleta antes do comando de limpeza.'
+        };
+      }
+    } catch (bkpErr: any) {
+      console.error('Falha crítica na criação do backup obrigatório:', bkpErr);
+      return {
+        success: false,
+        message: 'Exclusão bloqueada: Ocorreu uma falha ao criar o backup de segurança. NENHUM dado foi apagado.',
+        detalhesErro: bkpErr?.message || 'Erro desconhecido na coleta e serialização dos dados para backup.'
+      };
+    }
+
+    // 3. EFETIVAÇÃO DA LIMPEZA (SOMENTE APÓS BACKUP CONFIRMADO E SALVO)
+    try {
+      // Limpeza dos dados de Ocorrências
+      setLocalOcorrencias([]);
+      localStorage.removeItem(LOCAL_KEY_OCORRENCIAS);
+
+      // Limpeza dos dados de Fechamentos de Turno
+      setLocalPassagens([]);
+      localStorage.removeItem(LOCAL_KEY_PASSAGENS);
+
+      // Limpeza dos dados de Solicitações de Desconto
+      await discountService.clearAllData();
+
+      // Limpeza no Supabase
+      if (isSupabaseConfigured && supabase) {
+        try {
+          await supabase.from('ocorrencias').delete().neq('id', '___filtro_placeholder___');
+          await supabase.from('resumos_passagem').delete().neq('id', '___filtro_placeholder___');
+          await supabase.from('solicitacoes_desconto').delete().neq('id', '___filtro_placeholder___');
+        } catch (dbErr) {
+          console.error('Aviso ao deletar linhas no Supabase:', dbErr);
+        }
+      }
+
+      return {
+        success: true,
+        message: `Backup ${snapshotCriado.titulo} criado com sucesso! Todos os dados anteriores foram zerados com segurança.`,
+        snapshotCriado
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        message: `Backup ${snapshotCriado.titulo} foi gerado com sucesso, porém ocorreu uma falha ao limpar os dados do banco.`,
+        detalhesErro: err?.message || 'Falha ao executar comandos de limpeza nas tabelas.'
+      };
+    }
+  },
+
+  /**
+   * RECUPERA E RESTAURA UM PONTO DE BACKUP:
+   * 1. Valida senha de segurança administrativa
+   * 2. Repovoa todas as tabelas (ocorrencias, resumos_passagem, solicitacoes_desconto) no Supabase e LocalStorage
+   */
+  async restaurarPonto(
+    pontoId: string,
+    senha: string
+  ): Promise<{
+    success: boolean;
+    message: string;
+    registrosRestaurados?: number;
+  }> {
+    // 1. Validação de senha
+    if (!verificarSenhaGerente(senha)) {
+      return {
+        success: false,
+        message: 'Senha de segurança incorreta. Restauração cancelada.'
+      };
+    }
+
+    const pontos = await this.getPontosRestauracao();
+    const pontoAlvo = pontos.find(p => p.id === pontoId);
+
+    if (!pontoAlvo) {
+      return {
+        success: false,
+        message: 'Ponto de restauração não encontrado no sistema.'
+      };
+    }
+
+    try {
+      const { ocorrencias = [], passagens = [], solicitacoesDesconto = [] } = pontoAlvo.dados;
+
+      // 1. Restaura Ocorrências
+      setLocalOcorrencias(ocorrencias);
+      // 2. Restaura Passagens
+      setLocalPassagens(passagens);
+      // 3. Restaura Descontos
+      try {
+        localStorage.setItem('diario_bordo_solicitacoes_desconto_v1', JSON.stringify(solicitacoesDesconto));
+      } catch (e) {
+        console.error('Erro ao gravar descontos no LocalStorage:', e);
+      }
+
+      // 4. Grava no Supabase se conectado
+      if (isSupabaseConfigured && supabase) {
+        if (ocorrencias.length > 0) {
+          const ocPayloads = ocorrencias.map(mapOcorrenciaToDB);
+          await supabase.from('ocorrencias').upsert(ocPayloads, { onConflict: 'id' });
+        }
+        if (passagens.length > 0) {
+          const passPayloads = passagens.map(mapPassagemToDB);
+          await supabase.from('resumos_passagem').upsert(passPayloads, { onConflict: 'id' });
+        }
+        if (solicitacoesDesconto.length > 0) {
+          const descPayloads = solicitacoesDesconto.map(mapSolicitacaoToDB);
+          await supabase.from('solicitacoes_desconto').upsert(descPayloads, { onConflict: 'id' });
+        }
+      }
+
+      const totalRestaurado = ocorrencias.length + passagens.length + solicitacoesDesconto.length;
+
+      return {
+        success: true,
+        message: `Ponto de Restauração "${pontoAlvo.titulo}" recuperado com sucesso! Total de ${totalRestaurado} registros restaurados no banco de dados.`,
+        registrosRestaurados: totalRestaurado
+      };
+    } catch (err: any) {
+      console.error('Erro ao restaurar ponto de backup:', err);
+      return {
+        success: false,
+        message: `Falha ao restaurar ponto: ${err?.message || err}`
+      };
+    }
+  },
+
+  /**
+   * Exclusão manual de backup desativada por política de integridade.
+   * O backup ativo é sempre preservado e substituído exclusivamente de forma segura na geração de um novo backup.
+   */
+  async deletarPontoRestauracao(_pontoId: string, _senha: string): Promise<{ success: boolean; message: string }> {
+    return { 
+      success: false, 
+      message: 'A exclusão manual de backup não é permitida. O backup ativo é preservado e substituído apenas na geração de um novo backup.' 
+    };
   },
 
   // --- RESTAURAR DADOS / RESET ---

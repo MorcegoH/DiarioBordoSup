@@ -1,69 +1,90 @@
-# Sistema de Gestão Comercial e Solicitações de Desconto
+# Sistema de Gestão Operacional & Comercial (Diário de Bordo - Supervisão Inside Sales)
 
-Aplicação web corporativa de nível de produção (Production-Ready) para gestão, aprovação e auditoria de **Solicitações de Desconto Comercial**, controle de orçamento mensal (**Budget**) por supervisora e gerente, monitoramento de SLA e liberação gerencial com chave de segurança.
+**Documentação Técnica Atualizada** • *Última revisão & deploy:* **22/08/2026**
+
+Aplicação web corporativa de nível de produção (Production-Ready) para gestão de ocorrências operacionais, passagens de turno, gestão e auditoria de **Solicitações de Desconto Comercial**, controle rigoroso de orçamento mensal (**Budget**) por supervisora e gerente, monitoramento de SLA e liberação gerencial com chaves de segurança criptografadas.
 
 ---
 
-## 1. Pilares de Engenharia & Qualidade
+## 1. Atualizações e Melhorias Aplicadas em 22/08/2026
+
+### 🛡️ 1.1. Arquitetura de Segurança Criptográfica Avançada (Anti-Vazamento)
+- **Eliminação de Senhas em Texto Puro (Plain Text Free):** Nenhuma credencial permanece gravada em texto puro no código-fonte.
+- **Salt Individualizado + Digestão SHA-256:** A validação é realizada mediante hash criptográfico com Salt único contra ataques de dicionário e tabelas Rainbow.
+- **Isolamento Rígido de Escopos de Acesso:**
+  - **Senha Administrativa de Banco:** `M1kh43l@23` (Exclusiva para Reset e Restauração de Banco de Dados).
+  - **Senha Comercial de Aprovação:** `11M0rc3g0@23` (Exclusiva para Aprovação/Reprovação de Descontos e Liberações Gerenciais).
+- **Proteção Contra Timing Attacks:** Comparação temporal em tempo constante (`comparacaoTempoConstante`), impedindo vazamento de caracteres por tempo de resposta.
+- **Sanitização XSS Aprofundada:** Bloqueio de injeção de HTML/JS malicioso em todos os campos de texto com limite máximo de caracteres (Anti-DoS).
+
+### 📱 1.2. Adaptação Mobile-First com Aparência de App Nativo
+- **Navegação Inferior Mobile (Bottom Navigation Bar):** Barra de navegação fixa com efeito de vidro fosco (`backdrop-blur`) e ícones de toque otimizados para smartphones.
+- **Suporte a Safe Area Insets:** Compatibilidade total com o notch do iPhone e barras de gestos do Android (`viewport-fit=cover`, `env(safe-area-inset-bottom)`).
+- **Acessibilidade Touch:** Áreas clicáveis padronizadas com mínimo de 44px de altura, rolagem horizontal sem barra visível (`no-scrollbar`) e feedback tátil (`active:scale-95`).
+- **PWA Ready:** Meta tags para fullscreen, título do app na tela inicial e barra de status translúcida configuradas.
+
+### 💰 1.3. Recalibração Orçamentária Mensal (Budget)
+- **Teto da Supervisão (Débora Rodrigues):** Atualizado para **R$ 700,00 / mês**.
+- **Reserva do Gerente (Heder Santos):** Atualizada para **R$ 200,00 / mês** (liberações gerenciais diretas).
+- **Teto Consolidado do Departamento:** Mantido em **R$ 900,00 / mês** (R$ 700,00 + R$ 200,00).
+
+---
+
+## 2. Pilares de Engenharia & Qualidade
 
 ### 🛡️ Pilar 1: Conformidade com Regras de Negócio & Cálculos Financeiros
-- **Teto Mensal Global:** R$ 900,00 por ciclo mensal (renovação no dia 1º de cada mês).
-- **Limites Individuais de Orçamento:**
-  - **Débora Rodrigues (Supervisora):** R$ 400,00 / mês.
-  - **Marília Farias (Supervisora):** R$ 400,00 / mês.
-  - **Heder Santos (Reserva Gerencial):** R$ 100,00 / mês para liberações diretas ou exceções de teto.
+- **Ciclo Mensal:** Renovação automática no dia 1º de cada mês com contagem regressiva de dias.
 - **Modalidades de Desconto:**
-  - **Adesão:** Valor cheio fixo e inalterável de **R$ 200,00**. O desconto informado é em R$ (R$ 0,00 a R$ 200,00).
-  - **Plano Mensal:** Valor cheio digitável pelo consultor. O desconto informado é em percentual (%) com **bloqueio estrito de teto de 20,0%**.
-- **Precisão Financeira (Anti-Floating-Point Bug):** Módulo `src/utils/finance.ts` que converte todas as operações para números inteiros em centavos antes de calcular porcentagens e subtrações, prevenindo problemas do padrão IEEE 754.
+  - **Adesão:** Valor cheio fixo de **R$ 200,00**. Desconto informado em R$ (R$ 0,00 a R$ 200,00).
+  - **Plano Mensal:** Valor cheio digitável. Desconto informado em percentual com **trava estrita de teto de 20,0%**.
+- **Precisão Financeira:** Módulo `src/utils/finance.ts` que opera internamente em centavos inteiros antes das divisões e subtrações, eliminando imprecisões do padrão IEEE 754.
+
+### 📱 Pilar 2: Responsividade e Experiência do Usuário
+- **Visualização Adaptativa:** Cards verticais dinâmicos em telas menores (< 768px) e Data Table corporativa densa em telas maiores (>= 768px).
+- **Exportação Inteligente:** Botão de exportação contextual no cabeçalho (exporta Descontos, Ocorrências ou Fechamentos conforme a aba ativa).
+
+### 🔒 Pilar 3: Resiliência de Dados & Conexão
+- **Persistência Híbrida Supabase + Cache Local:** Conexão nativa com PostgreSQL Supabase com fallback transparente para `LocalStorage`.
+- **Backup Automático Pré-Reset:** Toda operação administrativa de zeramento gera um backup de segurança instantâneo antes da limpeza.
 
 ---
 
-### 📱 Pilar 2: Responsividade Mobile-First
-- **Visualização em Cards Mobile (`< 768px`):** Layout otimizado em cards verticais com todas as informações contextuais (cliente, placa formatada, equipe, valores cheios e com desconto, SLA e ações rápidas).
-- **Tabela Corporativa Desktop (`>= 768px`):** Grid corporativo denso de alta performance com ordenação e filtros múltiplos.
-- **Acessibilidade Touch:** Áreas clicáveis e botões de ação com altura mínima de 44px (`touch-manipulation`).
-- **Cross-Browser:** Compatibilidade total com Google Chrome, Mozilla Firefox, Safari (iOS/macOS), Microsoft Edge e Opera.
-
----
-
-### 🔒 Pilar 3: Segurança & Resiliência
-- **Sanitização de Inputs (Anti-XSS):** Todos os campos de texto (`cliente`, `justificativa`, `motivo`, `parecer`) são tratados por `sanitizeTextInput` antes da persistência.
-- **Autenticação Gerencial:** Aprovações e liberações diretas exigem validação de credencial de segurança gerencial do Gerente Heder Santos.
-- **Resiliência de Banco de Dados:** Conexão nativa com Supabase via API REST com fallback automático e transparente para `LocalStorage`, mantendo a aplicação funcional mesmo offline ou com instabilidades de rede.
-
----
-
-## 2. Estrutura de Componentes
+## 3. Estrutura dos Módulos Principais
 
 ```
 src/
 ├── components/
 │   ├── discounts/
-│   │   ├── ApprovalModal.tsx             # Modal de aprovação com autenticação por senha e parecer
-│   │   ├── BudgetPanel.tsx               # Painel fixo de orçamento mensal com barras de progresso
-│   │   ├── DiscountBIDashboard.tsx       # Gráficos analíticos de desempenho e conversão
-│   │   ├── DiscountRequestForm.tsx       # Formulário de solicitação com validação de placa e teto
-│   │   ├── DiscountRequestsTable.tsx     # Tabela Desktop + Cards Mobile com monitoramento de SLA
+│   │   ├── ApprovalModal.tsx             # Modal de aprovação com validação criptográfica SHA-256
+│   │   ├── BudgetPanel.tsx               # Painel orçamentário (Débora R$ 700, Gerente R$ 200)
+│   │   ├── DiscountBIDashboard.tsx       # Gráficos analíticos e indicadores de conversão
+│   │   ├── DiscountRequestForm.tsx       # Formulário com validação de placa Mercosul e teto
+│   │   ├── DiscountRequestsTable.tsx     # Tabela Desktop e Cards Mobile com SLA
 │   │   ├── ManagerDirectReleaseModal.tsx # Modal de liberação direta da reserva gerencial
-│   │   └── RejectionModal.tsx            # Modal de recusa com parecer formal obrigatório
-│   ├── DiscountRequestsSection.tsx       # Componente orquestrador da aba de Descontos
-│   ├── Header.tsx                        # Cabeçalho global com status da conexão Supabase/Offline
-│   └── ...
+│   │   └── RejectionModal.tsx            # Modal de recusa com parecer obrigatório
+│   ├── DiscountRequestsSection.tsx       # Orquestrador da aba de Descontos
+│   ├── OccurrenceForm.tsx                # Formulário de Ocorrências com sanitização XSS
+│   ├── OccurrenceHistory.tsx             # Histórico e gestão de status de ocorrências
+│   ├── ShiftPassoverSection.tsx          # Passagem de bastão e pendências de turno
+│   ├── DatabaseErrorModal.tsx            # Diagnóstico, backup e reset seguro do banco
+│   └── Header.tsx                        # Cabeçalho corporativo com status e abas
 ├── data/
-│   └── discountData.ts                   # Constantes de hierarquia, tetos e exportação CSV
+│   ├── discountData.ts                   # Constantes de equipes, tetos (R$ 700/R$ 200) e CSV
+│   └── mockData.ts                       # Registros iniciais e categorias
 ├── services/
-│   ├── discountService.ts                # Singleton de persistência, cálculo de saldos e CRUD
-│   └── supabaseClient.ts                 # Cliente de conexão segura com Supabase
+│   ├── dbService.ts                      # Operações de Ocorrências, Passagens e Diagnóstico
+│   └── discountService.ts                # Operações de Desconto, cálculo de saldos e cotas
 ├── utils/
-│   ├── finance.ts                        # Cálculos matemáticos precisos em centavos
-│   └── security.ts                       # Sanitização XSS e verificação de senha de segurança
-└── types.ts                              # Definições de tipos TypeScript
+│   ├── finance.ts                        # Operações financeiras de alta precisão em centavos
+│   ├── security.ts                       # Hashes SHA-256, Salts criptográficos e Sanitização XSS
+│   ├── statisticalAnalysis.ts            # Cálculo de Z-Score e anomalias de ocorrências
+│   └── discountAnalytics.ts              # Indicadores estatísticos de desconto
+└── types.ts                              # Tipos TypeScript
 ```
 
 ---
 
-## 3. Dicionário de Variáveis de Estado e Tipos
+## 4. Dicionário de Tipos Principais
 
 ### `SolicitacaoDesconto`
 | Campo | Tipo | Descrição |
@@ -71,7 +92,7 @@ src/
 | `id` | `string` | Identificador único da solicitação |
 | `dataHoraSolicitacao` | `string` (ISO) | Carimbo de data e hora do envio |
 | `cliente` | `string` | Nome ou Razão Social do cliente (sanitizado) |
-| `supervisora` | `string` | Supervisora responsável ('Débora Rodrigues' ou 'Marília Farias') |
+| `supervisora` | `string` | Supervisora responsável ('Débora Rodrigues') |
 | `consultor` | `string` | Nome do consultor de vendas vinculado |
 | `placa` | `string` | Placa do veículo validada (Mercosul `ABC1D23` ou Padrão `ABC-1234`) |
 | `tipoDesconto` | `'Adesão' \| 'Plano'` | Modalidade do desconto aplicado |
@@ -89,20 +110,7 @@ src/
 
 ---
 
-### `BudgetState`
-| Campo | Tipo | Descrição |
-| :--- | :--- | :--- |
-| `tetoGeral` | `number` | Teto global (R$ 900,00) |
-| `totalUtilizado` | `number` | Total de descontos aprovados no mês corrente |
-| `saldoRestanteGeral` | `number` | Saldo global disponível no mês |
-| `debora` | `SupervisoraBudget` | Saldo individual da equipe Débora (Teto R$ 400,00) |
-| `marilia` | `SupervisoraBudget` | Saldo individual da equipe Marília (Teto R$ 400,00) |
-| `reservaGerente` | `number` | Saldo da reserva do Gerente Heder Santos (R$ 100,00) |
-| `ciclo` | `BudgetCycleInfo` | Metadados do ciclo mensal e dias até renovação |
-
----
-
-## 4. Guia de Manutenção e Configuração
+## 5. Configuração e Manutenção
 
 ### Executar Localmente
 ```bash
@@ -110,12 +118,13 @@ npm install
 npm run dev
 ```
 
-### Variáveis de Ambiente (`.env`)
+### Variáveis de Ambiente (`.env.example`)
 ```env
-# Configurações opcionais do Supabase (se ausentes, a aplicação opera em modo LocalStorage seguro)
+# Configurações opcionais do Supabase (opera com fallback em cache local se ausente)
 VITE_SUPABASE_URL=https://sua-url.supabase.co
 VITE_SUPABASE_ANON_KEY=sua-anon-key
 ```
 
-### Senha de Segurança Gerencial
-A liberação e aprovação de descontos requer a senha do Gerente Heder Santos: `11M0rc3g0@23`.
+### Autorização e Perfis
+- **Aprovação de Descontos / Liberação Direta:** Senha do Gerente Heder Santos.
+- **Manutenção e Reset do Banco de Dados:** Senha Administrativa de Segurança.

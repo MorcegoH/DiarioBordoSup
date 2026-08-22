@@ -168,11 +168,11 @@ export default function App() {
       />
 
       {/* Main Container */}
-      <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="flex-grow w-full max-w-[1800px] mx-auto px-3 sm:px-6 lg:px-8 xl:px-10 py-4 sm:py-6 pb-24 md:pb-8">
         
         {/* Guia 1: Ocorrências & Registro */}
         {activeTab === 'ocorrencias' && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* SEÇÃO 2: Formulário de Registro (Nova Entrada) */}
             <OccurrenceForm onAddOcorrencia={handleAddOcorrencia} />
 
@@ -211,9 +211,88 @@ export default function App() {
 
       </main>
 
+      {/* Barra de Navegação Inferior Fixa Mobile (Estilo App Nativo) */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-lg px-2 py-1.5 pb-safe flex items-center justify-around">
+        <button
+          onClick={() => {
+            setActiveTab('ocorrencias');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
+            activeTab === 'ocorrencias'
+              ? 'text-[#005b2e] font-bold'
+              : 'text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          <span className={`p-1 rounded-lg ${activeTab === 'ocorrencias' ? 'bg-emerald-100 text-[#005b2e]' : ''}`}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+            </svg>
+          </span>
+          <span className="text-[10px] tracking-tight mt-0.5">Ocorrências</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab('descontos');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
+            activeTab === 'descontos'
+              ? 'text-[#005b2e] font-bold'
+              : 'text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          <span className={`p-1 rounded-lg ${activeTab === 'descontos' ? 'bg-emerald-100 text-[#005b2e]' : ''}`}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+            </svg>
+          </span>
+          <span className="text-[10px] tracking-tight mt-0.5">Descontos</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab('dashboard');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
+            activeTab === 'dashboard'
+              ? 'text-[#005b2e] font-bold'
+              : 'text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          <span className={`p-1 rounded-lg ${activeTab === 'dashboard' ? 'bg-emerald-100 text-[#005b2e]' : ''}`}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          </span>
+          <span className="text-[10px] tracking-tight mt-0.5">BI & Métricas</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab('passagem');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
+            activeTab === 'passagem'
+              ? 'text-[#005b2e] font-bold'
+              : 'text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          <span className={`p-1 rounded-lg ${activeTab === 'passagem' ? 'bg-emerald-100 text-[#005b2e]' : ''}`}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </span>
+          <span className="text-[10px] tracking-tight mt-0.5">Turno</span>
+        </button>
+      </div>
+
       {/* Footer Corporativo */}
-      <footer className="bg-white dark:bg-[#1a1b1e] border-t border-gray-200 dark:border-[#2b2e36] mt-12 py-4 transition-colors duration-200">
-        <div className="max-w-7xl mx-auto px-4 text-center text-xs text-gray-500 dark:text-gray-400 font-medium">
+      <footer className="hidden md:block bg-white dark:bg-[#1a1b1e] border-t border-gray-200 dark:border-[#2b2e36] mt-12 py-4 transition-colors duration-200">
+        <div className="w-full max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 text-center text-xs text-gray-500 dark:text-gray-400 font-medium">
           <p>
             Diário de Bordo - Supervisão Inside Sales • Sales Ops Intelligence System © {new Date().getFullYear()}
           </p>
