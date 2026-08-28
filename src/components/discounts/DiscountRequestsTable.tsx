@@ -25,13 +25,15 @@ import {
   Calendar,
   X,
   User,
-  Tag
+  Tag,
+  Trash2
 } from 'lucide-react';
 
 interface DiscountRequestsTableProps {
   solicitacoes: SolicitacaoDesconto[];
   onOpenAprovarModal: (solicitacao: SolicitacaoDesconto) => void;
   onOpenReprovarModal: (solicitacao: SolicitacaoDesconto) => void;
+  onOpenDeleteModal: (solicitacao: SolicitacaoDesconto) => void;
   onResetMockData: () => void;
   onOpenManagerRelease?: () => void;
 }
@@ -40,18 +42,30 @@ export const DiscountRequestsTable: React.FC<DiscountRequestsTableProps> = React
   solicitacoes,
   onOpenAprovarModal,
   onOpenReprovarModal,
+  onOpenDeleteModal,
   onResetMockData,
   onOpenManagerRelease
 }) => {
   // Filtros
   const [statusFiltro, setStatusFiltro] = useState<'TODAS' | StatusDesconto>('TODAS');
-  const [supervisoraFiltro, setSupervisoraFiltro] = useState<string>('TODAS');
+  const [consultorFiltro, setConsultorFiltro] = useState<string>('TODOS');
   const [tipoFiltro, setTipoFiltro] = useState<string>('TODOS');
   const [dataFiltro, setDataFiltro] = useState<string>('');
   const [busca, setBusca] = useState<string>('');
   
   // Modal de Detalhes/Parecer
   const [detalhesItem, setDetalhesItem] = useState<SolicitacaoDesconto | null>(null);
+
+  // Lista dinâmica e ordenada de consultores únicos a partir das solicitações
+  const consultoresDisponiveis = useMemo(() => {
+    const setConsultores = new Set<string>();
+    solicitacoes.forEach((item) => {
+      if (item.consultor && item.consultor.trim()) {
+        setConsultores.add(item.consultor.trim());
+      }
+    });
+    return Array.from(setConsultores).sort((a, b) => a.localeCompare(b));
+  }, [solicitacoes]);
 
   // Contagem por status
   const contagens = useMemo(() => {
@@ -73,8 +87,8 @@ export const DiscountRequestsTable: React.FC<DiscountRequestsTableProps> = React
       if (statusFiltro !== 'TODAS' && item.status !== statusFiltro) {
         return false;
       }
-      // Filtro de Supervisora
-      if (supervisoraFiltro !== 'TODAS' && !item.supervisora.includes(supervisoraFiltro)) {
+      // Filtro por Consultor
+      if (consultorFiltro !== 'TODOS' && item.consultor !== consultorFiltro) {
         return false;
       }
       // Filtro de Tipo
@@ -98,7 +112,7 @@ export const DiscountRequestsTable: React.FC<DiscountRequestsTableProps> = React
       }
       return true;
     });
-  }, [solicitacoes, statusFiltro, supervisoraFiltro, tipoFiltro, dataFiltro, busca]);
+  }, [solicitacoes, statusFiltro, consultorFiltro, tipoFiltro, dataFiltro, busca]);
 
   // Função para calcular o tempo de SLA decorrido
   const getSLAInfo = (dataSolicitacaoStr: string, status: StatusDesconto) => {
@@ -225,15 +239,18 @@ export const DiscountRequestsTable: React.FC<DiscountRequestsTableProps> = React
         {/* Filtros Dropdown, Data e Busca */}
         <div className="flex flex-wrap items-center gap-2">
           
-          {/* Supervisora / Liderança */}
+          {/* Filtro por Consultor */}
           <select
-            value={supervisoraFiltro}
-            onChange={(e) => setSupervisoraFiltro(e.target.value)}
+            value={consultorFiltro}
+            onChange={(e) => setConsultorFiltro(e.target.value)}
             className="px-2.5 py-1.5 text-xs bg-gray-50 border border-gray-300 rounded-lg text-gray-700 font-medium cursor-pointer"
           >
-            <option value="TODAS">Liderança: Todas</option>
-            <option value="Débora">Débora Rodrigues (Supervisão)</option>
-            <option value="Gerência">Gerência (Heder Santos)</option>
+            <option value="TODOS">Consultor: Todos</option>
+            {consultoresDisponiveis.map((c) => (
+              <option key={`opt-consultor-${c}`} value={c}>
+                {c}
+              </option>
+            ))}
           </select>
 
           {/* Tipo de Desconto */}
@@ -295,7 +312,7 @@ export const DiscountRequestsTable: React.FC<DiscountRequestsTableProps> = React
               setDataFiltro('');
               setBusca('');
               setStatusFiltro('TODAS');
-              setSupervisoraFiltro('TODAS');
+              setConsultorFiltro('TODOS');
               setTipoFiltro('TODOS');
               onResetMockData();
             }}
@@ -407,13 +424,13 @@ export const DiscountRequestsTable: React.FC<DiscountRequestsTableProps> = React
                   </div>
 
                   {/* Ações Mobile (com área touch mínima de 44px) */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     {item.status === 'Aguardando Aprovação' ? (
                       <>
                         <button
                           id={`btn-aprovar-mobile-${item.id}`}
                           onClick={() => onOpenAprovarModal(item)}
-                          className="min-h-[44px] px-3 py-2 bg-primary-green hover:bg-emerald-800 text-white font-bold text-xs rounded-lg shadow-xs flex items-center gap-1.5 cursor-pointer touch-manipulation"
+                          className="min-h-[44px] px-3 py-2 bg-primary-green hover:bg-emerald-800 text-white font-bold text-xs rounded-lg shadow-xs flex items-center gap-1.5 cursor-pointer touch-manipulation active:scale-95"
                         >
                           <ShieldCheck className="w-4 h-4" />
                           <span>Aprovar</span>
@@ -421,7 +438,7 @@ export const DiscountRequestsTable: React.FC<DiscountRequestsTableProps> = React
                         <button
                           id={`btn-reprovar-mobile-${item.id}`}
                           onClick={() => onOpenReprovarModal(item)}
-                          className="min-h-[44px] px-3 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-lg shadow-xs flex items-center gap-1.5 cursor-pointer touch-manipulation"
+                          className="min-h-[44px] px-3 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-lg shadow-xs flex items-center gap-1.5 cursor-pointer touch-manipulation active:scale-95"
                         >
                           <XCircle className="w-4 h-4" />
                           <span>Recusar</span>
@@ -431,12 +448,22 @@ export const DiscountRequestsTable: React.FC<DiscountRequestsTableProps> = React
                       <button
                         id={`btn-parecer-mobile-${item.id}`}
                         onClick={() => setDetalhesItem(item)}
-                        className="min-h-[44px] px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs rounded-lg border border-gray-300 flex items-center gap-1.5 cursor-pointer touch-manipulation"
+                        className="min-h-[44px] px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs rounded-lg border border-gray-300 flex items-center gap-1.5 cursor-pointer touch-manipulation active:scale-95"
                       >
                         <Eye className="w-4 h-4 text-gray-500" />
                         <span>Ver Parecer</span>
                       </button>
                     )}
+
+                    {/* Botão de Excluir Seguro (Requer Senha de Segurança) */}
+                    <button
+                      id={`btn-excluir-mobile-${item.id}`}
+                      onClick={() => onOpenDeleteModal(item)}
+                      className="min-h-[44px] min-w-[44px] p-2 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-lg border border-red-200 flex items-center justify-center cursor-pointer touch-manipulation transition-colors active:scale-95"
+                      title="Excluir Desconto (Requer Senha de Segurança)"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
 
@@ -581,38 +608,50 @@ export const DiscountRequestsTable: React.FC<DiscountRequestsTableProps> = React
 
                     {/* Ações Gerenciais */}
                     <td className="px-3.5 py-3.5 text-right whitespace-nowrap">
-                      {item.status === 'Aguardando Aprovação' ? (
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            id={`btn-aprovar-desktop-${item.id}`}
-                            onClick={() => onOpenAprovarModal(item)}
-                            className="px-2.5 py-1.5 bg-primary-green hover:bg-emerald-800 text-white font-bold text-xs rounded-lg shadow-xs transition-all flex items-center gap-1 cursor-pointer"
-                            title="Aprovar com Senha de Segurança e Parecer"
-                          >
-                            <ShieldCheck className="w-3.5 h-3.5" />
-                            <span>Aprovar</span>
-                          </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        {item.status === 'Aguardando Aprovação' ? (
+                          <>
+                            <button
+                              id={`btn-aprovar-desktop-${item.id}`}
+                              onClick={() => onOpenAprovarModal(item)}
+                              className="px-2.5 py-1.5 bg-primary-green hover:bg-emerald-800 text-white font-bold text-xs rounded-lg shadow-xs transition-all flex items-center gap-1 cursor-pointer"
+                              title="Aprovar com Senha de Segurança e Parecer"
+                            >
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                              <span>Aprovar</span>
+                            </button>
 
+                            <button
+                              id={`btn-reprovar-desktop-${item.id}`}
+                              onClick={() => onOpenReprovarModal(item)}
+                              className="px-2.5 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-lg shadow-xs transition-all flex items-center gap-1 cursor-pointer"
+                              title="Reprovar com Parecer Obrigatório"
+                            >
+                              <XCircle className="w-3.5 h-3.5" />
+                              <span>Reprovar</span>
+                            </button>
+                          </>
+                        ) : (
                           <button
-                            id={`btn-reprovar-desktop-${item.id}`}
-                            onClick={() => onOpenReprovarModal(item)}
-                            className="px-2.5 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-lg shadow-xs transition-all flex items-center gap-1 cursor-pointer"
-                            title="Reprovar com Parecer Obrigatório"
+                            id={`btn-parecer-desktop-${item.id}`}
+                            onClick={() => setDetalhesItem(item)}
+                            className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-xs rounded-lg border border-gray-300 transition-colors flex items-center gap-1 cursor-pointer"
                           >
-                            <XCircle className="w-3.5 h-3.5" />
-                            <span>Reprovar</span>
+                            <Eye className="w-3.5 h-3.5 text-gray-500" />
+                            <span>Ver Parecer</span>
                           </button>
-                        </div>
-                      ) : (
+                        )}
+
+                        {/* Botão Excluir Registro (Requer Senha de Segurança) */}
                         <button
-                          id={`btn-parecer-desktop-${item.id}`}
-                          onClick={() => setDetalhesItem(item)}
-                          className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-xs rounded-lg border border-gray-300 transition-colors flex items-center gap-1 ml-auto cursor-pointer"
+                          id={`btn-excluir-desktop-${item.id}`}
+                          onClick={() => onOpenDeleteModal(item)}
+                          className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 font-medium text-xs rounded-lg border border-red-200 transition-colors flex items-center justify-center cursor-pointer ml-0.5"
+                          title="Excluir Desconto (Requer Senha de Segurança)"
                         >
-                          <Eye className="w-3.5 h-3.5 text-gray-500" />
-                          <span>Ver Parecer</span>
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
-                      )}
+                      </div>
                     </td>
 
                   </tr>

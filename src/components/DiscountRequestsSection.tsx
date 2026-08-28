@@ -13,11 +13,13 @@ import { DiscountRequestsTable } from './discounts/DiscountRequestsTable';
 import { ApprovalModal } from './discounts/ApprovalModal';
 import { RejectionModal } from './discounts/RejectionModal';
 import { ManagerDirectReleaseModal } from './discounts/ManagerDirectReleaseModal';
+import { DeleteDiscountModal } from './discounts/DeleteDiscountModal';
 
 export const DiscountRequestsSection: React.FC = React.memo(() => {
   const [solicitacoes, setSolicitacoes] = useState<SolicitacaoDesconto[]>([]);
   const [selectedForApproval, setSelectedForApproval] = useState<SolicitacaoDesconto | null>(null);
   const [selectedForRejection, setSelectedForRejection] = useState<SolicitacaoDesconto | null>(null);
+  const [selectedForDelete, setSelectedForDelete] = useState<SolicitacaoDesconto | null>(null);
   const [isManagerModalOpen, setIsManagerModalOpen] = useState<boolean>(false);
   const [mesSelecionado, setMesSelecionado] = useState<string>('');
 
@@ -68,6 +70,12 @@ export const DiscountRequestsSection: React.FC = React.memo(() => {
     setSolicitacoes(atualizadas);
   }, []);
 
+  // Handler para confirmar exclusão segura com recálculo automático de budget
+  const handleConfirmDelete = useCallback(async (id: string) => {
+    const atualizadas = await discountService.deleteSolicitacao(id);
+    setSolicitacoes(atualizadas);
+  }, []);
+
   // Resetar dados para estado limpo
   const handleResetMockData = useCallback(async () => {
     if (window.confirm('Deseja limpar todos os registros de solicitações de desconto?')) {
@@ -99,6 +107,7 @@ export const DiscountRequestsSection: React.FC = React.memo(() => {
         solicitacoes={solicitacoes}
         onOpenAprovarModal={(item) => setSelectedForApproval(item)}
         onOpenReprovarModal={(item) => setSelectedForRejection(item)}
+        onOpenDeleteModal={(item) => setSelectedForDelete(item)}
         onResetMockData={handleResetMockData}
         onOpenManagerRelease={() => setIsManagerModalOpen(true)}
       />
@@ -126,6 +135,14 @@ export const DiscountRequestsSection: React.FC = React.memo(() => {
         isOpen={!!selectedForRejection}
         onClose={() => setSelectedForRejection(null)}
         onConfirmReprovacao={handleConfirmReprovacao}
+      />
+
+      {/* Modal de Exclusão Segura com Senha de Segurança Administrativa */}
+      <DeleteDiscountModal
+        solicitacao={selectedForDelete}
+        isOpen={!!selectedForDelete}
+        onClose={() => setSelectedForDelete(null)}
+        onConfirmDelete={handleConfirmDelete}
       />
 
     </div>
