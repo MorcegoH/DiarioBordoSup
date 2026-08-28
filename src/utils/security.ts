@@ -7,11 +7,11 @@
  * As senhas são protegidas com Salt individualizado e Hash SHA-256 criptográfico.
  */
 
-// Salt e Hash SHA-256 da Senha Administrativa (Operações Críticas: Zerar Banco, Restaurar Backup)
+// Salt e Hash SHA-256 da Senha Administrativa (Operações Críticas: Zerar Banco, Restaurar Backup, Exclusão de Descontos e Ocorrências)
 const ADMIN_SECURITY_SALT = 's4lt_4dm1n_m1kh43l_2026_s3cur3';
-const ADMIN_HASH_SHA256 = 'e254fcdf2c201424fc2073611075aa0d8b2a3f58fbc85f0f7746bafcce0170ed';
+const ADMIN_HASH_SHA256 = '62a64143e176f9033b78b1f7de3172fae88bd7fa33cdfa4de8b639f0d1dcdbc9';
 
-// Salt e Hash SHA-256 da Senha de Aprovação de Descontos (Operação Comercial do Gerente)
+// Salt e Hash SHA-256 da Senha de Aprovação de Descontos (Operação Comercial do Gerente / Supervisão)
 const APPROVAL_SECURITY_SALT = 's4lt_4ppr0v_h3d3r_s4nt0s_2026';
 const APPROVAL_HASH_SHA256 = 'c80a722a66a570811698d374185050e4df307de6d4f7899eca05534fd8672074';
 
