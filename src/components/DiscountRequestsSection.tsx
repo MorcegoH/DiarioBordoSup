@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { SolicitacaoDesconto } from '../types';
+import { SolicitacaoDesconto, AuthUser } from '../types';
 import { discountService } from '../services/discountService';
 import { BudgetPanel } from './discounts/BudgetPanel';
 import { DiscountRequestForm } from './discounts/DiscountRequestForm';
@@ -15,7 +15,11 @@ import { RejectionModal } from './discounts/RejectionModal';
 import { ManagerDirectReleaseModal } from './discounts/ManagerDirectReleaseModal';
 import { DeleteDiscountModal } from './discounts/DeleteDiscountModal';
 
-export const DiscountRequestsSection: React.FC = React.memo(() => {
+interface DiscountRequestsSectionProps {
+  currentUser?: AuthUser | null;
+}
+
+export const DiscountRequestsSection: React.FC<DiscountRequestsSectionProps> = React.memo(({ currentUser }) => {
   const [solicitacoes, setSolicitacoes] = useState<SolicitacaoDesconto[]>([]);
   const [selectedForApproval, setSelectedForApproval] = useState<SolicitacaoDesconto | null>(null);
   const [selectedForRejection, setSelectedForRejection] = useState<SolicitacaoDesconto | null>(null);
@@ -127,6 +131,7 @@ export const DiscountRequestsSection: React.FC = React.memo(() => {
         isOpen={!!selectedForApproval}
         onClose={() => setSelectedForApproval(null)}
         onConfirmAprovacao={handleConfirmAprovacao}
+        currentUser={currentUser}
       />
 
       {/* Modal de Reprovação com Parecer Obrigatório */}

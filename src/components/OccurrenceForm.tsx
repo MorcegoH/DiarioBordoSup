@@ -17,9 +17,17 @@ interface OccurrenceFormProps {
 
 export const OccurrenceForm: React.FC<OccurrenceFormProps> = React.memo(({
   onAddOcorrencia,
-  defaultSupervisor = 'Debora Rodrigues'
+  defaultSupervisor = 'Débora Rodrigues'
 }) => {
   const [supervisor, setSupervisor] = useState<string>(defaultSupervisor);
+
+  // Sincroniza o supervisor padrão quando a prop muda (ex: login efetuado)
+  React.useEffect(() => {
+    if (defaultSupervisor) {
+      setSupervisor(defaultSupervisor);
+    }
+  }, [defaultSupervisor]);
+
   const [categoria, setCategoria] = useState<Categoria>('Sistemas & Ferramentas');
   const [descricao, setDescricao] = useState<string>('');
   const [impacto, setImpacto] = useState<Impacto>('Baixo');
@@ -151,21 +159,13 @@ export const OccurrenceForm: React.FC<OccurrenceFormProps> = React.memo(({
           
           {/* Supervisor Responsável */}
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1 flex items-center justify-between">
-              <span className="flex items-center gap-1">
-                <User className="w-3.5 h-3.5 text-emerald-700" />
-                Supervisor Responsável *
-              </span>
-              <span className="text-[10px] text-gray-400 font-normal">Gerente: Heder Santos</span>
+            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1 flex items-center gap-1">
+              <User className="w-3.5 h-3.5 text-emerald-700" />
+              Supervisor Responsável
             </label>
-            <select
-              value={supervisor}
-              onChange={(e) => setSupervisor(e.target.value)}
-              className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#005b2e] focus:border-[#005b2e] focus:bg-white transition-all text-gray-800 font-medium"
-            >
-              <option value="Heder Santos">Heder Santos (Gerente de Vendas)</option>
-              <option value="Debora Rodrigues">Debora Rodrigues (Supervisora)</option>
-            </select>
+            <div className="w-full px-3 py-2 text-sm bg-gray-100 border border-gray-300 rounded-lg text-gray-800 font-semibold shadow-2xs">
+              {supervisor || defaultSupervisor}
+            </div>
           </div>
 
           {/* Categoria da Ocorrência */}

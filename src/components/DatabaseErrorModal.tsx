@@ -43,7 +43,9 @@ import {
   Layers as LayersIcon
 } from 'lucide-react';
 import { dbService, DbHealthStatus } from '../services/dbService';
-import { PontoRestauracao } from '../types';
+import { PontoRestauracao, AuthUser } from '../types';
+import { PasswordManagerSection } from './auth/PasswordManagerSection';
+import { KeyRound } from 'lucide-react';
 
 interface DatabaseErrorModalProps {
   isOpen: boolean;
@@ -52,6 +54,8 @@ interface DatabaseErrorModalProps {
   onRetryConnection: () => Promise<void>;
   onSyncComplete?: () => void;
   onDataResetOrRestored?: () => void;
+  currentUser?: AuthUser | null;
+  initialTab?: 'visao_geral' | 'diagnostico' | 'backup_reset' | 'gestao_senhas';
 }
 
 export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
@@ -60,13 +64,21 @@ export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
   healthStatus,
   onRetryConnection,
   onSyncComplete,
-  onDataResetOrRestored
+  onDataResetOrRestored,
+  currentUser,
+  initialTab
 }) => {
   const isHealthy = healthStatus.isConnected && !healthStatus.errorCode;
 
-  const [activeTab, setActiveTab] = useState<'visao_geral' | 'diagnostico' | 'backup_reset'>(
-    isHealthy ? 'visao_geral' : 'diagnostico'
+  const [activeTab, setActiveTab] = useState<'visao_geral' | 'diagnostico' | 'backup_reset' | 'gestao_senhas'>(
+    initialTab || (isHealthy ? 'visao_geral' : 'diagnostico')
   );
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   const [isRetrying, setIsRetrying] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -352,6 +364,19 @@ export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
           >
             <RotateCcw className="w-3.5 h-3.5 text-emerald-700" />
             <span>Limpar e Backup</span>
+          </button>
+
+          {/* Aba 4: Gestão de Senhas (Perfil do Gerente) */}
+          <button
+            onClick={() => setActiveTab('gestao_senhas')}
+            className={`px-3 sm:px-4 py-2 text-xs font-bold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+              activeTab === 'gestao_senhas'
+                ? 'border-emerald-700 text-emerald-900 bg-white rounded-t-lg shadow-2xs font-extrabold'
+                : 'border-transparent text-gray-500 hover:text-gray-800'
+            }`}
+          >
+            <KeyRound className="w-3.5 h-3.5 text-emerald-700" />
+            <span>Gestão de Senhas & Acessos</span>
           </button>
         </div>
 
@@ -997,6 +1022,11 @@ export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
               </div>
 
             </div>
+          )}
+
+          {/* ================= ABA 4: GESTÃO DE SENHAS E ACESSOS ================= */}
+          {activeTab === 'gestao_senhas' && (
+            <PasswordManagerSection currentUser={currentUser || null} />
           )}
 
         </div>

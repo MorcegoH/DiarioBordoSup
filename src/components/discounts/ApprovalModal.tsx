@@ -1,27 +1,31 @@
 /**
  * @file src/components/discounts/ApprovalModal.tsx
  * @description Modal de Aprovação de Desconto (Visão Gerente Heder Santos).
- * Exige Senha de Segurança do Sistema e Parecer / Autorização escrito.
+ * Quando logado como Gerente, permite aprovação direta simplificada.
+ * Caso contrário, exige senha de autorização comercial.
  */
 
 import React, { useState } from 'react';
-import { SolicitacaoDesconto } from '../../types';
+import { SolicitacaoDesconto, AuthUser } from '../../types';
 import { verifyApprovalAuthorization, sanitizeTextInput } from '../../utils/security';
-import { ShieldCheck, Lock, CheckCircle2, AlertTriangle, X, Eye, EyeOff } from 'lucide-react';
+import { ShieldCheck, Lock, CheckCircle2, AlertTriangle, X, Eye, EyeOff, Sparkles, UserCheck } from 'lucide-react';
 
 interface ApprovalModalProps {
   solicitacao: SolicitacaoDesconto | null;
   isOpen: boolean;
   onClose: () => void;
   onConfirmAprovacao: (id: string, parecer: string, aprovador: string) => void;
+  currentUser?: AuthUser | null;
 }
 
 export const ApprovalModal: React.FC<ApprovalModalProps> = React.memo(({
   solicitacao,
   isOpen,
   onClose,
-  onConfirmAprovacao
+  onConfirmAprovacao,
+  currentUser
 }) => {
+  const isManagerLogged = currentUser?.role === 'manager';
   const [senhaInput, setSenhaInput] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [parecer, setParecer] = useState<string>('Autorizado conforme política comercial.');
@@ -33,13 +37,15 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = React.memo(({
     e.preventDefault();
     setErroSenha(null);
 
-    const trimmedPass = senhaInput.trim();
-    // Valida a senha específica e exclusiva de aprovação de descontos (via Hash SHA-256 seguro)
-    const isSenhaValida = verifyApprovalAuthorization(trimmedPass);
+    // Se o Gerente já estiver logado na sessão ativa, a aprovação é direta
+    if (!isManagerLogged) {
+      const trimmedPass = senhaInput.trim();
+      const isSenhaValida = verifyApprovalAuthorization(trimmedPass);
 
-    if (!isSenhaValida) {
-      setErroSenha('Senha de Segurança incorreta! Insira a senha autorizada para aprovação de descontos.');
-      return;
+      if (!isSenhaValida) {
+        setErroSenha('Senha de Segurança incorreta! Insira a senha autorizada para aprovação de descontos.');
+        return;
+      }
     }
 
     const cleanParecer = sanitizeTextInput(parecer, 1500);
@@ -48,7 +54,11 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = React.memo(({
       return;
     }
 
-    onConfirmAprovacao(solicitacao.id, cleanParecer, 'Heder Santos (Gerente)');
+    const nomeAprovador = currentUser?.name 
+      ? `${currentUser.name} (${currentUser.cargo || 'Gerente'})` 
+      : 'Heder Santos (Gerente)';
+
+    onConfirmAprovacao(solicitacao.id, cleanParecer, nomeAprovador);
     setSenhaInput('');
     setErroSenha(null);
     onClose();
@@ -69,7 +79,7 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = React.memo(({
                 Aprovação de Desconto
               </h3>
               <p className="text-xs text-emerald-100/90 font-medium">
-                Workflow Gerencial • Aprovador: <strong>Heder Santos</strong>
+                Workflow Gerencial • Aprovador: <strong>{currentUser?.name || 'Heder Santos'}</strong>
               </p>
             </div>
           </div>
@@ -131,41 +141,53 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = React.memo(({
             </p>
           </div>
 
-          {/* Campo de Senha de Segurança */}
-          <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1 flex items-center justify-between">
-              <span className="flex items-center gap-1 text-emerald-900">
-                <Lock className="w-3.5 h-3.5 text-emerald-700" />
-                Senha de Segurança do Sistema *
+          {/* Status de Autenticação / Campo de Senha */}
+          {isManagerLogged ? (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2 text-emerald-900 font-semibold">
+                <UserCheck className="w-4 h-4 text-[#005b2e]" />
+                <span>Gerente Autenticado: <strong>{currentUser.name}</strong></span>
+              </div>
+              <span className="px-2 py-0.5 bg-emerald-200/80 text-emerald-900 font-bold rounded text-[11px]">
+                Aprovação Direta Habilitada
               </span>
-              <span className="text-[10px] text-gray-400 font-normal">Exigida para homologação financeira</span>
-            </label>
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                required
-                value={senhaInput}
-                onChange={(e) => {
-                  setSenhaInput(e.target.value);
-                  setErroSenha(null);
-                }}
-                placeholder="Informe a senha gerencial..."
-                className="w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#005b2e] focus:border-[#005b2e] text-gray-800 pr-10 font-mono"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600 cursor-pointer"
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
             </div>
-            {erroSenha && (
-              <p className="text-[11px] text-red-600 font-medium mt-1 flex items-center gap-1">
-                <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {erroSenha}
-              </p>
-            )}
-          </div>
+          ) : (
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+                <span className="flex items-center gap-1 text-emerald-900">
+                  <Lock className="w-3.5 h-3.5 text-emerald-700" />
+                  Senha de Segurança do Sistema *
+                </span>
+                <span className="text-[10px] text-gray-400 font-normal">Exigida para homologação financeira</span>
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={senhaInput}
+                  onChange={(e) => {
+                    setSenhaInput(e.target.value);
+                    setErroSenha(null);
+                  }}
+                  placeholder="Informe a senha de aprovação..."
+                  className="w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#005b2e] focus:border-[#005b2e] text-gray-800 pr-10 font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600 cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              {erroSenha && (
+                <p className="text-[11px] text-red-600 font-medium mt-1 flex items-center gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {erroSenha}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Campo de Parecer / Autorização */}
           <div>
@@ -206,3 +228,4 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = React.memo(({
     </div>
   );
 });
+

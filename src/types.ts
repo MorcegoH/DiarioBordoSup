@@ -16,6 +16,34 @@ export type Impacto = 'Baixo' | 'Médio' | 'Crítico';
 export type Status = 'Pendente' | 'Em Análise' | 'Resolvido';
 
 /**
+ * =====================================================================
+ * TIPOS DE AUTENTICAÇÃO, USUÁRIOS E CONTROLE DE ACESSO (RBAC)
+ * =====================================================================
+ */
+export type UserRole = 'manager' | 'supervisor';
+
+export interface AuthUser {
+  id: string;
+  username: string;
+  name: string;
+  role: UserRole;
+  email?: string;
+  cargo: string;
+  avatarColor?: string;
+  ultimoAcesso?: string;
+}
+
+export interface UserCredentialData {
+  username: string;
+  name: string;
+  role: UserRole;
+  cargo: string;
+  salt: string;
+  hashSha256: string;
+  updatedAt: string;
+}
+
+/**
  * Representa um registro individual de atualização de andamento da ocorrência (Card de Trabalho).
  */
 export interface RegistroAtualizacao {

@@ -5,10 +5,12 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Ocorrencia, ResumoPassagem, Status } from './types';
+import { Ocorrencia, ResumoPassagem, Status, AuthUser } from './types';
 import { INITIAL_MOCK_OCORRENCIAS, INITIAL_MOCK_PASSAGENS } from './data/mockData';
 import { dbService } from './services/dbService';
 import { discountService } from './services/discountService';
+import { authService } from './services/authService';
+import { LoginScreen } from './components/auth/LoginScreen';
 import { Header } from './components/Header';
 import { OccurrenceForm } from './components/OccurrenceForm';
 import { OccurrenceHistory } from './components/OccurrenceHistory';
@@ -19,16 +21,37 @@ import { exportToCSV, exportPassagensToCSV } from './utils/statisticalAnalysis';
 import { exportarDescontosCSV } from './data/discountData';
 
 export default function App() {
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => authService.getCurrentUser());
   const [activeTab, setActiveTab] = useState<'ocorrencias' | 'dashboard' | 'passagem' | 'descontos'>('ocorrencias');
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>(INITIAL_MOCK_OCORRENCIAS);
   const [passagens, setPassagens] = useState<ResumoPassagem[]>(INITIAL_MOCK_PASSAGENS);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Inicializar credenciais e serviços de autenticação
+  useEffect(() => {
+    authService.init();
+    const user = authService.getCurrentUser();
+    if (user) {
+      setCurrentUser(user);
+    }
+  }, []);
 
   // Garantir tema claro original permanentemente
   useEffect(() => {
     document.documentElement.classList.remove('dark');
     document.body.classList.remove('dark');
     localStorage.setItem('diario_bordo_theme', 'light');
+  }, []);
+
+  // Handler de Logout
+  const handleLogout = useCallback(() => {
+    authService.logout();
+    setCurrentUser(null);
+  }, []);
+
+  // Handler de Sucesso de Login
+  const handleLoginSuccess = useCallback((user: AuthUser) => {
+    setCurrentUser(user);
   }, []);
 
   // Carrega os dados iniciais do Supabase ou do LocalStorage
@@ -152,10 +175,15 @@ export default function App() {
     return count;
   }, [ocorrencias]);
 
+  // Se não houver usuário logado, apresenta a tela de Login com identificação
+  if (!currentUser) {
+    return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
+  }
+
   return (
     <div className="min-h-screen bg-[#f4f7f6] text-[#333333] flex flex-col font-sans transition-colors duration-200">
       
-      {/* SEÇÃO 1: Cabeçalho com logo, título e status do Supabase */}
+      {/* SEÇÃO 1: Cabeçalho com logo, título, status do Supabase e Perfil do Usuário */}
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -165,6 +193,8 @@ export default function App() {
         passagens={passagens}
         onExportCSV={handleExportCSV}
         onDataSynced={loadInitialData}
+        currentUser={currentUser}
+        onLogout={handleLogout}
       />
 
       {/* Main Container */}
@@ -174,7 +204,10 @@ export default function App() {
         {activeTab === 'ocorrencias' && (
           <div className="space-y-4 sm:space-y-6">
             {/* SEÇÃO 2: Formulário de Registro (Nova Entrada) */}
-            <OccurrenceForm onAddOcorrencia={handleAddOcorrencia} />
+            <OccurrenceForm 
+              onAddOcorrencia={handleAddOcorrencia} 
+              defaultSupervisor={currentUser.name}
+            />
 
             {/* SEÇÃO 3: Histórico de Ocorrências */}
             <OccurrenceHistory
@@ -188,7 +221,7 @@ export default function App() {
 
         {/* Guia 2: Solicitações de Desconto & Governança de Inside Sales */}
         {activeTab === 'descontos' && (
-          <DiscountRequestsSection />
+          <DiscountRequestsSection currentUser={currentUser} />
         )}
 
         {/* Guia 3: Dashboard BI & Z-Score Anomaly Engine */}
@@ -206,6 +239,7 @@ export default function App() {
             onUpdateStatusPassagem={handleUpdatePassagemStatus}
             onDeletePassagem={handleDeletePassagem}
             onAddComentarioPassagem={handleAddComentarioPassagem}
+            defaultSupervisor={currentUser.name}
           />
         )}
 

@@ -5,10 +5,10 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, BarChart3, ClipboardList, Sparkles, Clock, Download, Database, CheckCircle2, ServerOff, BadgePercent } from 'lucide-react';
+import { ShieldCheck, BarChart3, ClipboardList, Sparkles, Clock, Download, Database, CheckCircle2, ServerOff, BadgePercent, LogOut, User, KeyRound } from 'lucide-react';
 import { dbService, DbHealthStatus } from '../services/dbService';
 import { DatabaseErrorModal } from './DatabaseErrorModal';
-import { Ocorrencia, ResumoPassagem } from '../types';
+import { Ocorrencia, ResumoPassagem, AuthUser } from '../types';
 
 interface HeaderProps {
   activeTab: 'ocorrencias' | 'dashboard' | 'passagem' | 'descontos';
@@ -21,6 +21,8 @@ interface HeaderProps {
   onDataSynced?: () => void;
   isDarkMode?: boolean;
   onToggleDarkMode?: () => void;
+  currentUser?: AuthUser | null;
+  onLogout?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = React.memo(({
@@ -33,11 +35,14 @@ export const Header: React.FC<HeaderProps> = React.memo(({
   onExportCSV,
   onDataSynced,
   isDarkMode = true,
-  onToggleDarkMode
+  onToggleDarkMode,
+  currentUser,
+  onLogout
 }) => {
   const [timeString, setTimeString] = useState<string>('');
   const [healthStatus, setHealthStatus] = useState<DbHealthStatus>(dbService.getHealthStatus());
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
+  const [modalInitialTab, setModalInitialTab] = useState<'visao_geral' | 'diagnostico' | 'backup_reset' | 'gestao_senhas' | undefined>(undefined);
 
   useEffect(() => {
     const updateTime = () => {
@@ -67,19 +72,15 @@ export const Header: React.FC<HeaderProps> = React.memo(({
     }
   };
 
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setTimeString(
-        now.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) +
-        ' • ' +
-        now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-      );
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
-  }, []);
+  const handleOpenPasswordManager = () => {
+    setModalInitialTab('gestao_senhas');
+    setIsErrorModalOpen(true);
+  };
+
+  const handleOpenGeneralDiagnostic = () => {
+    setModalInitialTab(undefined);
+    setIsErrorModalOpen(true);
+  };
 
   return (
     <header className="bg-primary-green text-white shadow-md border-b border-green-900 w-full">
@@ -121,7 +122,7 @@ export const Header: React.FC<HeaderProps> = React.memo(({
                 {/* Tag de Status de Conexão alinhada ao título */}
                 <button
                   type="button"
-                  onClick={() => setIsErrorModalOpen(true)}
+                  onClick={handleOpenGeneralDiagnostic}
                   className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border shadow-xs transition-all select-none cursor-pointer ${
                     healthStatus.isConnected
                       ? 'bg-emerald-900/80 text-emerald-100 border-emerald-500/50 hover:bg-emerald-800'
@@ -142,18 +143,46 @@ export const Header: React.FC<HeaderProps> = React.memo(({
               </div>
 
               <p className="text-xs sm:text-sm text-emerald-100/90 font-medium mt-0.5">
-                Gestão Operacional de Vendas • Gerente: <strong className="text-white">Heder Santos</strong>
+                Gestão Operacional de Vendas • Sales Ops Intelligence
               </p>
             </div>
           </div>
 
 
-          {/* Quick Stats & Controls */}
-          <div className="flex flex-wrap items-center gap-3 justify-between md:justify-end">
-            <div className="hidden lg:flex items-center gap-2 text-xs bg-emerald-900/60 px-3 py-1.5 rounded-lg border border-emerald-700/50 text-emerald-100">
+          {/* Quick Stats, User Profile & Controls */}
+          <div className="flex flex-wrap items-center gap-2.5 justify-between md:justify-end">
+            <div className="hidden xl:flex items-center gap-2 text-xs bg-emerald-900/60 px-3 py-1.5 rounded-lg border border-emerald-700/50 text-emerald-100">
               <Clock className="w-3.5 h-3.5 text-emerald-300" />
               <span>{timeString}</span>
             </div>
+
+            {/* CARD DO OPERADOR AUTENTICADO (Apenas Nome, Cargo e Botão de Sair) */}
+            {currentUser && (
+              <div className="flex items-center gap-2 bg-emerald-950/60 px-2.5 py-1.5 rounded-xl border border-emerald-700/50 shadow-xs">
+                <div className="text-xs font-bold text-white leading-tight flex items-center gap-1.5">
+                  <span>{currentUser.name}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
+                    currentUser.role === 'manager' 
+                      ? 'bg-emerald-500/30 text-emerald-200 border border-emerald-400/30'
+                      : 'bg-teal-500/30 text-teal-200 border border-teal-400/30'
+                  }`}>
+                    {currentUser.role === 'manager' ? 'Gerente' : 'Supervisora'}
+                  </span>
+                </div>
+
+                {/* Botão de Logout / Sair (Vermelho Neon Brilhante) */}
+                {onLogout && (
+                  <button
+                    type="button"
+                    onClick={onLogout}
+                    title="Sair / Encerrar Sessão"
+                    className="p-1.5 bg-red-500 hover:bg-red-400 text-white rounded-lg transition-all shadow-[0_0_12px_rgba(239,68,68,0.7)] hover:shadow-[0_0_18px_rgba(248,113,113,0.9)] border border-red-300/80 cursor-pointer active:scale-95 ml-1 flex items-center justify-center"
+                  >
+                    <LogOut className="w-3.5 h-3.5 stroke-[2.5]" />
+                  </button>
+                )}
+              </div>
+            )}
 
             <div className="flex items-center gap-2">
               <div className="bg-emerald-950/40 px-3 py-1.5 rounded-lg border border-emerald-700/40 flex items-center gap-2">
@@ -168,7 +197,7 @@ export const Header: React.FC<HeaderProps> = React.memo(({
                 </div>
               )}
 
-              {/* ARQUITETURA REFATORADA: Botão de Exportar CSV com Consciência Contextual de Aba */}
+              {/* Botão de Exportar CSV */}
               <button
                 id="btn-global-export-csv"
                 onClick={onExportCSV}
@@ -246,14 +275,19 @@ export const Header: React.FC<HeaderProps> = React.memo(({
         </nav>
       </div>
 
-      {/* Modal de Infraestrutura, Diagnóstico, Backup & Reset do Banco */}
+      {/* Modal de Infraestrutura, Diagnóstico, Backup, Reset & Gestão de Senhas */}
       <DatabaseErrorModal
         isOpen={isErrorModalOpen}
-        onClose={() => setIsErrorModalOpen(false)}
+        onClose={() => {
+          setIsErrorModalOpen(false);
+          setModalInitialTab(undefined);
+        }}
         healthStatus={healthStatus}
         onRetryConnection={handleRetryConnection}
         onSyncComplete={onDataSynced}
         onDataResetOrRestored={onDataSynced}
+        currentUser={currentUser}
+        initialTab={modalInitialTab}
       />
     </header>
   );

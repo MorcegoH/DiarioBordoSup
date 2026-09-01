@@ -46,10 +46,18 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
   onUpdateStatusPassagem,
   onDeletePassagem,
   onAddComentarioPassagem,
-  defaultSupervisor = 'Debora Rodrigues'
+  defaultSupervisor = 'Débora Rodrigues'
 }) => {
   // Estados do formulário de novo fechamento
   const [supervisor, setSupervisor] = useState<string>(defaultSupervisor);
+
+  // Sincroniza o supervisor padrão quando a prop muda
+  React.useEffect(() => {
+    if (defaultSupervisor) {
+      setSupervisor(defaultSupervisor);
+    }
+  }, [defaultSupervisor]);
+
   const [oQueFuncionou, setOQueFuncionou] = useState<string>('');
   const [oQueFicaPendente, setOQueFicaPendente] = useState<string>('');
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -432,21 +440,13 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
             
             {/* Supervisor */}
             <div>
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1 flex items-center justify-between">
-                <span className="flex items-center gap-1">
-                  <User className="w-3.5 h-3.5 text-emerald-700" />
-                  Supervisor Responsável *
-                </span>
-                <span className="text-[10px] text-gray-400 font-normal">Gerente: Heder Santos</span>
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1 flex items-center gap-1">
+                <User className="w-3.5 h-3.5 text-emerald-700" />
+                Supervisor Responsável
               </label>
-              <select
-                value={supervisor}
-                onChange={(e) => setSupervisor(e.target.value)}
-                className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#005b2e] font-medium"
-              >
-                <option value="Heder Santos">Heder Santos (Gerente de Vendas)</option>
-                <option value="Debora Rodrigues">Debora Rodrigues (Supervisora)</option>
-              </select>
+              <div className="w-full px-3 py-2 text-sm bg-gray-100 border border-gray-300 rounded-lg text-gray-800 font-semibold shadow-2xs">
+                {supervisor || defaultSupervisor}
+              </div>
             </div>
 
             {/* Data de Registro */}
