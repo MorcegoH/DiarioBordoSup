@@ -166,10 +166,54 @@ export function sanitizeTextInput(input: string, maxLength: number = 3000): stri
 }
 
 /**
- * Valida se a string é uma data válida no formato ISO para evitar inconsistências no banco.
+ * Valida e higieniza URLs externas para prevenir injeções de protocolos perigosos
+ * como javascript:, data:, vbscript: ou file:.
+ * Retorna uma string segura garantida ou null caso a URL seja inválida ou perigosa.
  */
-export function isValidISODate(dateStr?: string): boolean {
-  if (!dateStr) return false;
-  const timestamp = Date.parse(dateStr);
-  return !isNaN(timestamp);
+export function sanitizeSafeUrl(url?: string | null): string | null {
+  if (!url) return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+
+  // Rejeitar expressamente protocolos perigosos
+  if (/^(javascript|data|vbscript|file):/i.test(trimmed)) {
+    return null;
+  }
+
+  // Permitir apenas protocolos estritamente válidos
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      const parsed = new URL(trimmed);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        return parsed.toString();
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Gera URL segura para contato via WhatsApp a partir de um número de telefone brasileiro
+ */
+export function getSafeWhatsAppUrl(phoneStr?: string | null, customText?: string): string | null {
+  if (!phoneStr) return null;
+  const digits = phoneStr.replace(/\D/g, '');
+  if (digits.length < 10) return null;
+
+  const phoneWithCountry = digits.startsWith('55') && digits.length >= 12 ? digits : `55${digits}`;
+  const textParam = customText ? `?text=${encodeURIComponent(customText)}` : '';
+  return `https://wa.me/${phoneWithCountry}${textParam}`;
+}
+
+/**
+ * Gera URL segura para discagem telefônica direta (tel:)
+ */
+export function getSafePhoneCallUrl(phoneStr?: string | null): string | null {
+  if (!phoneStr) return null;
+  const digits = phoneStr.replace(/\D/g, '');
+  if (digits.length < 10) return null;
+  return `tel:+55${digits}`;
 }

@@ -5,14 +5,14 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, BarChart3, ClipboardList, Sparkles, Clock, Download, Database, CheckCircle2, ServerOff, BadgePercent, LogOut, User, KeyRound } from 'lucide-react';
+import { ShieldCheck, BarChart3, ClipboardList, Sparkles, Clock, Download, Database, CheckCircle2, ServerOff, BadgePercent, LogOut, User, KeyRound, Car } from 'lucide-react';
 import { dbService, DbHealthStatus } from '../services/dbService';
 import { DatabaseErrorModal } from './DatabaseErrorModal';
 import { Ocorrencia, ResumoPassagem, AuthUser } from '../types';
 
 interface HeaderProps {
-  activeTab: 'ocorrencias' | 'dashboard' | 'passagem' | 'descontos';
-  setActiveTab: (tab: 'ocorrencias' | 'dashboard' | 'passagem' | 'descontos') => void;
+  activeTab: 'ocorrencias' | 'dashboard' | 'passagem' | 'descontos' | 'vistoria';
+  setActiveTab: (tab: 'ocorrencias' | 'dashboard' | 'passagem' | 'descontos' | 'vistoria') => void;
   totalOcorrencias: number;
   totalCriticos: number;
   ocorrencias: Ocorrencia[];
@@ -115,7 +115,7 @@ export const Header: React.FC<HeaderProps> = React.memo(({
                   title="Ir para a Página Inicial (Diário de Bordo)"
                 >
                   <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white group-hover:text-emerald-100 transition-colors">
-                    Diário de Bordo - Supervisão
+                    Diário de Bordo - I.S
                   </h1>
                 </a>
 
@@ -143,7 +143,7 @@ export const Header: React.FC<HeaderProps> = React.memo(({
               </div>
 
               <p className="text-xs sm:text-sm text-emerald-100/90 font-medium mt-0.5">
-                Gestão Operacional de Vendas • Sales Ops Intelligence
+                Gestão Operacional do Departametno Inside Sales
               </p>
             </div>
           </div>
@@ -156,27 +156,51 @@ export const Header: React.FC<HeaderProps> = React.memo(({
               <span>{timeString}</span>
             </div>
 
-            {/* CARD DO OPERADOR AUTENTICADO (Apenas Nome, Cargo e Botão de Sair) */}
+            {/* CARD DO OPERADOR AUTENTICADO (Apenas Nome, Cargo e Botão de Sair com Bisel e Vidro) */}
             {currentUser && (
-              <div className="flex items-center gap-2 bg-emerald-950/60 px-2.5 py-1.5 rounded-xl border border-emerald-700/50 shadow-xs">
+              <div 
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl backdrop-blur-md transition-all"
+                style={{
+                  background: 'linear-gradient(180deg, rgba(1, 40, 20, 0.75) 0%, rgba(1, 26, 13, 0.88) 100%)',
+                  borderTop: '1px solid rgba(110, 231, 183, 0.4)',
+                  borderBottom: '1px solid rgba(0, 0, 0, 0.3)',
+                  borderLeft: '1px solid rgba(16, 185, 129, 0.25)',
+                  borderRight: '1px solid rgba(16, 185, 129, 0.25)',
+                  boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.25), 0 3px 8px rgba(0, 0, 0, 0.2)'
+                }}
+              >
                 <div className="text-xs font-bold text-white leading-tight flex items-center gap-1.5">
-                  <span>{currentUser.name}</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
-                    currentUser.role === 'manager' 
-                      ? 'bg-emerald-500/30 text-emerald-200 border border-emerald-400/30'
-                      : 'bg-teal-500/30 text-teal-200 border border-teal-400/30'
-                  }`}>
+                  <span className="tracking-tight">{currentUser.name}</span>
+                  <span 
+                    className="text-[10px] px-2 py-0.5 rounded-full font-bold shadow-2xs"
+                    style={{
+                      background: currentUser.role === 'manager' 
+                        ? 'linear-gradient(180deg, rgba(16, 185, 129, 0.35) 0%, rgba(5, 150, 105, 0.25) 100%)'
+                        : 'linear-gradient(180deg, rgba(20, 184, 166, 0.35) 0%, rgba(13, 148, 136, 0.25) 100%)',
+                      color: currentUser.role === 'manager' ? '#a7f3d0' : '#99f6e4',
+                      borderTop: '1px solid rgba(255, 255, 255, 0.3)',
+                      borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
+                      boxShadow: 'inset 0 0.5px 0.5px rgba(255, 255, 255, 0.4)'
+                    }}
+                  >
                     {currentUser.role === 'manager' ? 'Gerente' : 'Supervisora'}
                   </span>
                 </div>
 
-                {/* Botão de Logout / Sair (Vermelho Neon Brilhante) */}
+                {/* Botão de Logout / Sair (Vermelho Neon Brilhante com Bisel Superior) */}
                 {onLogout && (
                   <button
                     type="button"
                     onClick={onLogout}
                     title="Sair / Encerrar Sessão"
-                    className="p-1.5 bg-red-500 hover:bg-red-400 text-white rounded-lg transition-all shadow-[0_0_12px_rgba(239,68,68,0.7)] hover:shadow-[0_0_18px_rgba(248,113,113,0.9)] border border-red-300/80 cursor-pointer active:scale-95 ml-1 flex items-center justify-center"
+                    className="p-1.5 bg-red-500 hover:bg-red-400 text-white rounded-lg transition-all shadow-[0_0_12px_rgba(239,68,68,0.7)] hover:shadow-[0_0_18px_rgba(248,113,113,0.95)] cursor-pointer active:scale-95 ml-1 flex items-center justify-center relative overflow-hidden"
+                    style={{
+                      borderTop: '1px solid rgba(254, 202, 202, 0.85)',
+                      borderBottom: '1.5px solid rgba(153, 27, 27, 0.9)',
+                      borderLeft: '1px solid rgba(220, 38, 38, 0.7)',
+                      borderRight: '1px solid rgba(220, 38, 38, 0.7)',
+                      boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.5), 0 0 12px rgba(239, 68, 68, 0.75)'
+                    }}
                   >
                     <LogOut className="w-3.5 h-3.5 stroke-[2.5]" />
                   </button>
@@ -202,7 +226,9 @@ export const Header: React.FC<HeaderProps> = React.memo(({
                 id="btn-global-export-csv"
                 onClick={onExportCSV}
                 title={
-                  activeTab === 'descontos'
+                  activeTab === 'vistoria'
+                    ? 'Exportar Solicitações de Vistoria para Excel/CSV'
+                    : activeTab === 'descontos'
                     ? 'Exportar Solicitações de Desconto para Excel/CSV'
                     : activeTab === 'passagem'
                     ? 'Exportar Fechamentos de Turno e Pendências para Excel/CSV'
@@ -212,7 +238,9 @@ export const Header: React.FC<HeaderProps> = React.memo(({
               >
                 <Download className="w-3.5 h-3.5 text-emerald-200" />
                 <span className="hidden sm:inline">
-                  {activeTab === 'descontos'
+                  {activeTab === 'vistoria'
+                    ? 'Exportar Vistorias'
+                    : activeTab === 'descontos'
                     ? 'Exportar Descontos'
                     : activeTab === 'passagem'
                     ? 'Exportar Fechamento'
@@ -223,15 +251,19 @@ export const Header: React.FC<HeaderProps> = React.memo(({
           </div>
         </div>
 
-        {/* Navigation Tabs - Estilo App com suporte a touch e rolagem suave */}
+        {/* Navigation Tabs - Estilo App com suporte a touch e rolagem suave com bisel */}
         <nav className="flex overflow-x-auto space-x-2 mt-4 pt-2 border-t border-emerald-700/60 no-scrollbar touch-pan-x py-1">
           <button
             onClick={() => setActiveTab('ocorrencias')}
             className={`flex items-center space-x-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 select-none ${
               activeTab === 'ocorrencias'
-                ? 'bg-white text-[#005b2e] shadow-sm font-bold ring-2 ring-white/30'
+                ? 'bg-white text-[#005b2e] font-bold ring-1 ring-white/60'
                 : 'text-emerald-100 bg-white/5 hover:bg-emerald-800/60 hover:text-white'
             }`}
+            style={activeTab === 'ocorrencias' ? {
+              boxShadow: 'inset 0 1.5px 1px rgba(255, 255, 255, 0.9), 0 3px 8px rgba(0, 0, 0, 0.18)',
+              borderTop: '1px solid #ffffff'
+            } : undefined}
           >
             <ClipboardList className="w-4 h-4" />
             <span>Ocorrências & Registro</span>
@@ -241,21 +273,45 @@ export const Header: React.FC<HeaderProps> = React.memo(({
             onClick={() => setActiveTab('descontos')}
             className={`flex items-center space-x-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 select-none ${
               activeTab === 'descontos'
-                ? 'bg-white text-[#005b2e] shadow-sm font-bold ring-2 ring-white/30'
+                ? 'bg-white text-[#005b2e] font-bold ring-1 ring-white/60'
                 : 'text-emerald-100 bg-white/5 hover:bg-emerald-800/60 hover:text-white'
             }`}
+            style={activeTab === 'descontos' ? {
+              boxShadow: 'inset 0 1.5px 1px rgba(255, 255, 255, 0.9), 0 3px 8px rgba(0, 0, 0, 0.18)',
+              borderTop: '1px solid #ffffff'
+            } : undefined}
           >
             <BadgePercent className="w-4 h-4" />
             <span>Solicitações de Desconto</span>
           </button>
 
           <button
+            onClick={() => setActiveTab('vistoria')}
+            className={`flex items-center space-x-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 select-none ${
+              activeTab === 'vistoria'
+                ? 'bg-white text-[#005b2e] font-bold ring-1 ring-white/60'
+                : 'text-emerald-100 bg-white/5 hover:bg-emerald-800/60 hover:text-white'
+            }`}
+            style={activeTab === 'vistoria' ? {
+              boxShadow: 'inset 0 1.5px 1px rgba(255, 255, 255, 0.9), 0 3px 8px rgba(0, 0, 0, 0.18)',
+              borderTop: '1px solid #ffffff'
+            } : undefined}
+          >
+            <Car className="w-4 h-4" />
+            <span>Solicitação de Vistoria</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('dashboard')}
             className={`flex items-center space-x-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 select-none ${
               activeTab === 'dashboard'
-                ? 'bg-white text-[#005b2e] shadow-sm font-bold ring-2 ring-white/30'
+                ? 'bg-white text-[#005b2e] font-bold ring-1 ring-white/60'
                 : 'text-emerald-100 bg-white/5 hover:bg-emerald-800/60 hover:text-white'
             }`}
+            style={activeTab === 'dashboard' ? {
+              boxShadow: 'inset 0 1.5px 1px rgba(255, 255, 255, 0.9), 0 3px 8px rgba(0, 0, 0, 0.18)',
+              borderTop: '1px solid #ffffff'
+            } : undefined}
           >
             <BarChart3 className="w-4 h-4" />
             <span>Dashboard BI</span>
@@ -265,9 +321,13 @@ export const Header: React.FC<HeaderProps> = React.memo(({
             onClick={() => setActiveTab('passagem')}
             className={`flex items-center space-x-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 select-none ${
               activeTab === 'passagem'
-                ? 'bg-white text-[#005b2e] shadow-sm font-bold ring-2 ring-white/30'
+                ? 'bg-white text-[#005b2e] font-bold ring-1 ring-white/60'
                 : 'text-emerald-100 bg-white/5 hover:bg-emerald-800/60 hover:text-white'
             }`}
+            style={activeTab === 'passagem' ? {
+              boxShadow: 'inset 0 1.5px 1px rgba(255, 255, 255, 0.9), 0 3px 8px rgba(0, 0, 0, 0.18)',
+              borderTop: '1px solid #ffffff'
+            } : undefined}
           >
             <Sparkles className="w-4 h-4" />
             <span>Fechamento de Turno</span>

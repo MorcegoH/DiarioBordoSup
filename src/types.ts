@@ -195,6 +195,49 @@ export interface BudgetState {
 
 /**
  * =====================================================================
+ * TIPOS PARA A ABA: SOLICITAÇÃO DE VISTORIA & OPERAÇÃO DE CAMPO
+ * =====================================================================
+ */
+
+export type Vistoriador = 'Danilo' | 'Lucas' | string;
+
+export type StatusVistoria = 'Aguardando Vistoria' | 'Aprovado' | 'Reprovado' | 'Cancelado';
+
+export interface SolicitacaoVistoria {
+  id: string;
+  dataHoraSolicitacao: string; // ISO string de cadastro
+  dataVistoria: string; // Formato YYYY-MM-DD
+  horarioVistoria: string; // Formato HH:mm
+  valorAdesao: number; // Valor acordado em reais R$
+  adesaoPaga: boolean; // true = Já foi paga, false = A receber pelo vistoriador
+  vistoriador: Vistoriador; // 'Danilo' | 'Lucas'
+  nomeAssociado: string;
+  contato: string; // Telefone com DDD
+  localizacaoMaps: string; // Link de localização do Google Maps
+  modeloCarro: string; // Modelo do carro
+  placa: string; // Placa normal ou Mercosul
+  tipoPlaca?: 'Mercosul' | 'Tradicional' | 'Inválida';
+  linkVistoria: string; // Hiperlink gerado por outro sistema
+  linkPagamento: string; // Hiperlink de pagamento gerado por outro sistema
+  solicitante?: string; // Consultor ou líder que solicitou
+  status: StatusVistoria;
+  dataHoraAprovacao?: string;
+  parecer?: string;
+  aprovador?: string;
+  motivoReprovacao?: string;
+}
+
+export interface FiltrosVistoria {
+  busca: string;
+  vistoriador: string;
+  status: string;
+  statusAdesao: string;
+  dataInicio?: string;
+  dataFim?: string;
+}
+
+/**
+ * =====================================================================
  * TIPOS PARA BACKUP, PONTO DE RESTAURAÇÃO E RESET SEGURO DO BANCO
  * =====================================================================
  */
@@ -208,12 +251,14 @@ export interface PontoRestauracao {
     ocorrencias: number;
     passagens: number;
     solicitacoesDesconto: number;
+    solicitacoesVistoria?: number;
     totalRegistros: number;
   };
   dados: {
     ocorrencias: Ocorrencia[];
     passagens: ResumoPassagem[];
     solicitacoesDesconto: SolicitacaoDesconto[];
+    solicitacoesVistoria?: SolicitacaoVistoria[];
   };
   scriptSql: string; // Script SQL com regras nativas para recriação e restauração direta no Supabase
 }

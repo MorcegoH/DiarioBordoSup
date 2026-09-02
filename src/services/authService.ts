@@ -11,6 +11,13 @@ import { sanitizeTextInput } from '../utils/security';
 // Chaves de armazenamento local
 const STORAGE_KEY_ACTIVE_USER = 'diario_bordo_active_session_user';
 const STORAGE_KEY_CUSTOM_CREDENTIALS = 'diario_bordo_custom_credentials_v2';
+const STORAGE_KEY_LAST_ACTIVITY = 'diario_bordo_last_activity_timestamp';
+const STORAGE_KEY_LOGOUT_REASON = 'diario_bordo_logout_reason';
+
+/**
+ * Tempo limite de inatividade permitido antes do logout automático (10 minutos)
+ */
+export const SESSION_INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutos (600.000 ms)
 
 /**
  * Função SHA-256 pura para geração determinística de hashes no navegador
@@ -200,7 +207,7 @@ class AuthService {
   }
 
   /**
-   * Recupera a sessão ativa salva no navegador
+   * Recupera a sessão ativa salva no navegador, verificando expiração por inatividade
    */
   private restoreSession(): void {
     try {
@@ -208,13 +215,73 @@ class AuthService {
       if (stored) {
         const parsed = JSON.parse(stored) as AuthUser;
         if (parsed && parsed.username && parsed.role) {
+          // Checa se o tempo de inatividade foi excedido (10 min)
+          if (this.isSessionExpiredDueToInactivity()) {
+            console.warn('[Segurança] Sessão prévia expirou por inatividade de 10+ minutos.');
+            this.logout('inactivity');
+            return;
+          }
+
           this.activeUser = parsed;
+          this.recordActivity();
         }
       }
     } catch (e) {
       console.warn('Não foi possível restaurar a sessão:', e);
       this.activeUser = null;
     }
+  }
+
+  /**
+   * Registra a marca temporal da atividade mais recente do usuário
+   */
+  public recordActivity(): void {
+    const now = Date.now();
+    try {
+      localStorage.setItem(STORAGE_KEY_LAST_ACTIVITY, now.toString());
+    } catch {
+      // Ignora falhas de storage
+    }
+  }
+
+  /**
+   * Retorna o timestamp da última atividade registrada
+   */
+  public getLastActivityTime(): number {
+    try {
+      const val = localStorage.getItem(STORAGE_KEY_LAST_ACTIVITY);
+      if (val) {
+        const parsed = parseInt(val, 10);
+        if (!isNaN(parsed) && parsed > 0) return parsed;
+      }
+    } catch {
+      // Fallback
+    }
+    return Date.now();
+  }
+
+  /**
+   * Verifica se a sessão atual expirou por inatividade
+   */
+  public isSessionExpiredDueToInactivity(): boolean {
+    const last = this.getLastActivityTime();
+    return (Date.now() - last) >= SESSION_INACTIVITY_TIMEOUT_MS;
+  }
+
+  /**
+   * Recupera e consome o motivo do último logout (ex: 'inactivity')
+   */
+  public getAndClearLogoutReason(): string | null {
+    try {
+      const reason = localStorage.getItem(STORAGE_KEY_LOGOUT_REASON);
+      if (reason) {
+        localStorage.removeItem(STORAGE_KEY_LOGOUT_REASON);
+        return reason;
+      }
+    } catch {
+      // Fallback
+    }
+    return null;
   }
 
   /**
@@ -351,6 +418,12 @@ class AuthService {
 
     this.activeUser = authUser;
     localStorage.setItem(STORAGE_KEY_ACTIVE_USER, JSON.stringify(authUser));
+    this.recordActivity();
+    try {
+      localStorage.removeItem(STORAGE_KEY_LOGOUT_REASON);
+    } catch {
+      // Ignora erro
+    }
     this.notifyListeners();
 
     return {
@@ -362,10 +435,21 @@ class AuthService {
 
   /**
    * Encerra a sessão ativa do usuário
+   * @param reason Motivo do encerramento ('manual' ou 'inactivity')
    */
-  public logout(): void {
+  public logout(reason: 'manual' | 'inactivity' = 'manual'): void {
     this.activeUser = null;
-    localStorage.removeItem(STORAGE_KEY_ACTIVE_USER);
+    try {
+      localStorage.removeItem(STORAGE_KEY_ACTIVE_USER);
+      localStorage.removeItem(STORAGE_KEY_LAST_ACTIVITY);
+      if (reason === 'inactivity') {
+        localStorage.setItem(STORAGE_KEY_LOGOUT_REASON, 'inactivity');
+      } else {
+        localStorage.removeItem(STORAGE_KEY_LOGOUT_REASON);
+      }
+    } catch {
+      // Fallback
+    }
     this.notifyListeners();
   }
 

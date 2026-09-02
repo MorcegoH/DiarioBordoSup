@@ -17,36 +17,47 @@ import { OccurrenceHistory } from './components/OccurrenceHistory';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { ShiftPassoverSection } from './components/ShiftPassoverSection';
 import { DiscountRequestsSection } from './components/DiscountRequestsSection';
+import { InspectionRequestsSection } from './components/InspectionRequestsSection';
+import { inspectionService } from './services/inspectionService';
 import { exportToCSV, exportPassagensToCSV } from './utils/statisticalAnalysis';
 import { exportarDescontosCSV } from './data/discountData';
+import { exportarVistoriasCSV } from './utils/csvInspectionExport';
+import { useInactivityTimeout } from './hooks/useInactivityTimeout';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => authService.getCurrentUser());
-  const [activeTab, setActiveTab] = useState<'ocorrencias' | 'dashboard' | 'passagem' | 'descontos'>('ocorrencias');
+  const [activeTab, setActiveTab] = useState<'ocorrencias' | 'dashboard' | 'passagem' | 'descontos' | 'vistoria'>('ocorrencias');
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>(INITIAL_MOCK_OCORRENCIAS);
   const [passagens, setPassagens] = useState<ResumoPassagem[]>(INITIAL_MOCK_PASSAGENS);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Inicializar credenciais e serviços de autenticação
+  // Handler de Logout
+  const handleLogout = useCallback(() => {
+    authService.logout();
+    setCurrentUser(null);
+  }, []);
+
+  // Monitoramento de inatividade: encerra sessão automaticamente após 10 minutos
+  useInactivityTimeout({
+    user: currentUser,
+    onTimeoutLogout: handleLogout
+  });
+
+  // Inicializar credenciais e serviços de autenticação com listener de estado
   useEffect(() => {
     authService.init();
     const user = authService.getCurrentUser();
     if (user) {
       setCurrentUser(user);
     }
-  }, []);
 
-  // Garantir tema claro original permanentemente
-  useEffect(() => {
-    document.documentElement.classList.remove('dark');
-    document.body.classList.remove('dark');
-    localStorage.setItem('diario_bordo_theme', 'light');
-  }, []);
+    const unsubscribe = authService.onAuthStateChanged((user) => {
+      setCurrentUser(user);
+    });
 
-  // Handler de Logout
-  const handleLogout = useCallback(() => {
-    authService.logout();
-    setCurrentUser(null);
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   // Handler de Sucesso de Login
@@ -154,7 +165,10 @@ export default function App() {
 
   // ARQUITETURA REFATORADA: Exportação Inteligente de CSV Contextual baseada na aba ativa
   const handleExportCSV = useCallback(() => {
-    if (activeTab === 'descontos') {
+    if (activeTab === 'vistoria') {
+      const vistorias = inspectionService.getVistorias();
+      exportarVistoriasCSV(vistorias);
+    } else if (activeTab === 'descontos') {
       const descontos = discountService.getSolicitacoes();
       exportarDescontosCSV(descontos);
     } else if (activeTab === 'passagem') {
@@ -224,12 +238,17 @@ export default function App() {
           <DiscountRequestsSection currentUser={currentUser} />
         )}
 
-        {/* Guia 3: Dashboard BI & Z-Score Anomaly Engine */}
+        {/* Guia 3: Solicitações de Vistoria & Gestão Danilo e Lucas */}
+        {activeTab === 'vistoria' && (
+          <InspectionRequestsSection currentUser={currentUser} />
+        )}
+
+        {/* Guia 4: Dashboard BI & Z-Score Anomaly Engine */}
         {activeTab === 'dashboard' && (
           <AnalyticsDashboard ocorrencias={ocorrencias} />
         )}
 
-        {/* Guia 4: SEÇÃO 4: Passagem de Bastão */}
+        {/* Guia 5: SEÇÃO 5: Passagem de Bastão */}
         {activeTab === 'passagem' && (
           <ShiftPassoverSection
             ocorrencias={ocorrencias}
@@ -283,6 +302,25 @@ export default function App() {
             </svg>
           </span>
           <span className="text-[10px] tracking-tight mt-0.5">Descontos</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab('vistoria');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
+            activeTab === 'vistoria'
+              ? 'text-[#005b2e] font-bold'
+              : 'text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          <span className={`p-1 rounded-lg ${activeTab === 'vistoria' ? 'bg-emerald-100 text-[#005b2e]' : ''}`}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 19H5a2 2 0 01-2-2V7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2zM9 15h6M7 11h10" />
+            </svg>
+          </span>
+          <span className="text-[10px] tracking-tight mt-0.5">Vistorias</span>
         </button>
 
         <button

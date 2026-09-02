@@ -5,9 +5,10 @@
  */
 
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { Ocorrencia, ResumoPassagem, Status, ComentarioPassagem, PontoRestauracao, SolicitacaoDesconto } from '../types';
+import { Ocorrencia, ResumoPassagem, Status, ComentarioPassagem, PontoRestauracao, SolicitacaoDesconto, SolicitacaoVistoria } from '../types';
 import { sanitizeTextInput, verificarSenhaGerente } from '../utils/security';
 import { discountService, mapSolicitacaoToDB } from './discountService';
+import { inspectionService, mapVistoriaToDB } from './inspectionService';
 
 const LOCAL_KEY_OCORRENCIAS = 'diario_bordo_ocorrencias_v1';
 const LOCAL_KEY_PASSAGENS = 'diario_bordo_passagens_v1';
@@ -246,7 +247,8 @@ function generateRestorePointSQL(
   autor: string,
   ocorrencias: Ocorrencia[],
   passagens: ResumoPassagem[],
-  solicitacoes: SolicitacaoDesconto[]
+  solicitacoes: SolicitacaoDesconto[],
+  vistorias: SolicitacaoVistoria[] = []
 ): string {
   const cleanTimestamp = dataHora.replace(/[-:T.Z]/g, '_').slice(0, 19);
   
@@ -255,13 +257,14 @@ function generateRestorePointSQL(
   sql += `-- Identificador: ${pontoId}\n`;
   sql += `-- Criado em: ${new Date(dataHora).toLocaleString('pt-BR')} por ${autor}\n`;
   sql += `-- Motivo: ${motivo.toUpperCase()} | ${titulo}\n`;
-  sql += `-- Total de Registros: ${ocorrencias.length} ocorrências, ${passagens.length} passagens, ${solicitacoes.length} descontos\n`;
+  sql += `-- Total de Registros: ${ocorrencias.length} ocorrências, ${passagens.length} passagens, ${solicitacoes.length} descontos, ${vistorias.length} vistorias\n`;
   sql += `-- =========================================================================\n\n`;
 
   sql += `-- 1. REGRAS NATIVAS POSTGRESQL PARA CRIAÇÃO DE TABELAS DE BACKUP (SNAPSHOT NO BANCO)\n`;
   sql += `CREATE TABLE IF NOT EXISTS public.backup_ocorrencias_${cleanTimestamp} AS TABLE public.ocorrencias WITH DATA;\n`;
   sql += `CREATE TABLE IF NOT EXISTS public.backup_resumos_passagem_${cleanTimestamp} AS TABLE public.resumos_passagem WITH DATA;\n`;
-  sql += `CREATE TABLE IF NOT EXISTS public.backup_solicitacoes_desconto_${cleanTimestamp} AS TABLE public.solicitacoes_desconto WITH DATA;\n\n`;
+  sql += `CREATE TABLE IF NOT EXISTS public.backup_solicitacoes_desconto_${cleanTimestamp} AS TABLE public.solicitacoes_desconto WITH DATA;\n`;
+  sql += `CREATE TABLE IF NOT EXISTS public.backup_solicitacoes_vistoria_${cleanTimestamp} AS TABLE public.solicitacoes_vistoria WITH DATA;\n\n`;
 
   sql += `-- 2. TABELA CENTRAL DE METADADOS DE PONTOS DE RESTAURAÇÃO\n`;
   sql += `CREATE TABLE IF NOT EXISTS public.pontos_restauracao (\n`;
@@ -357,6 +360,33 @@ function generateRestorePointSQL(
       sql += `  data_hora_aprovacao = EXCLUDED.data_hora_aprovacao,\n`;
       sql += `  parecer = EXCLUDED.parecer,\n`;
       sql += `  aprovador = EXCLUDED.aprovador;\n\n`;
+    });
+  }
+
+  if (vistorias.length > 0) {
+    sql += `-- Restaurar ${vistorias.length} Solicitações de Vistoria\n`;
+    vistorias.forEach((v) => {
+      const assocStr = (v.nomeAssociado || '').replace(/'/g, "''");
+      const contatoStr = (v.contato || '').replace(/'/g, "''");
+      const mapsStr = (v.localizacaoMaps || '').replace(/'/g, "''");
+      const carroStr = (v.modeloCarro || '').replace(/'/g, "''");
+      const placaStr = (v.placa || '').replace(/'/g, "''");
+      const vistLinkStr = (v.linkVistoria || '').replace(/'/g, "''");
+      const pagLinkStr = (v.linkPagamento || '').replace(/'/g, "''");
+      const parecerStr = (v.parecer || '').replace(/'/g, "''");
+      const aprovadorStr = (v.aprovador || '').replace(/'/g, "''");
+      const motivoReprovStr = (v.motivoReprovacao || '').replace(/'/g, "''");
+      const aprovVal = v.dataHoraAprovacao ? `'${v.dataHoraAprovacao}'` : 'NULL';
+      const solicitanteStr = (v.solicitante || '').replace(/'/g, "''");
+
+      sql += `INSERT INTO public.solicitacoes_vistoria (id, data_hora_solicitacao, data_vistoria, horario_vistoria, valor_adesao, adesao_paga, vistoriador, nome_associado, contato, localizacao_maps, modelo_carro, placa, tipo_placa, link_vistoria, link_pagamento, solicitante, status, data_hora_aprovacao, parecer, aprovador, motivo_reprovacao)\n`;
+      sql += `VALUES ('${v.id}', '${v.dataHoraSolicitacao}', '${v.dataVistoria}', '${v.horarioVistoria}', ${v.valorAdesao}, ${v.adesaoPaga}, '${v.vistoriador}', '${assocStr}', '${contatoStr}', '${mapsStr}', '${carroStr}', '${placaStr}', '${v.tipoPlaca || 'Mercosul'}', '${vistLinkStr}', '${pagLinkStr}', '${solicitanteStr}', '${v.status}', ${aprovVal}, '${parecerStr}', '${aprovadorStr}', '${motivoReprovStr}')\n`;
+      sql += `ON CONFLICT (id) DO UPDATE SET\n`;
+      sql += `  status = EXCLUDED.status,\n`;
+      sql += `  data_hora_aprovacao = EXCLUDED.data_hora_aprovacao,\n`;
+      sql += `  parecer = EXCLUDED.parecer,\n`;
+      sql += `  aprovador = EXCLUDED.aprovador,\n`;
+      sql += `  motivo_reprovacao = EXCLUDED.motivo_reprovacao;\n\n`;
     });
   }
 
@@ -1129,8 +1159,8 @@ export const dbService = {
             titulo: row.titulo,
             motivo: row.motivo || 'manual',
             autor: row.autor || 'Administrador',
-            contagem: row.contagem || { ocorrencias: 0, passagens: 0, solicitacoesDesconto: 0, totalRegistros: 0 },
-            dados: row.dados || { ocorrencias: [], passagens: [], solicitacoesDesconto: [] },
+            contagem: row.contagem || { ocorrencias: 0, passagens: 0, solicitacoesDesconto: 0, solicitacoesVistoria: 0, totalRegistros: 0 },
+            dados: row.dados || { ocorrencias: [], passagens: [], solicitacoesDesconto: [], solicitacoesVistoria: [] },
             scriptSql: row.script_sql || ''
           }));
 
@@ -1181,6 +1211,7 @@ export const dbService = {
     const ocorrencias = await this.getOcorrencias();
     const passagens = await this.getPassagens();
     const solicitacoesDesconto = await discountService.getSolicitacoesAsync();
+    const solicitacoesVistoria = await inspectionService.getVistoriasAsync();
 
     const id = `ponto-${agora.getFullYear()}${String(agora.getMonth() + 1).padStart(2, '0')}${String(agora.getDate()).padStart(2, '0')}-${String(agora.getHours()).padStart(2, '0')}${String(agora.getMinutes()).padStart(2, '0')}${String(agora.getSeconds()).padStart(2, '0')}`;
     
@@ -1191,7 +1222,8 @@ export const dbService = {
       ocorrencias: ocorrencias.length,
       passagens: passagens.length,
       solicitacoesDesconto: solicitacoesDesconto.length,
-      totalRegistros: ocorrencias.length + passagens.length + solicitacoesDesconto.length
+      solicitacoesVistoria: solicitacoesVistoria.length,
+      totalRegistros: ocorrencias.length + passagens.length + solicitacoesDesconto.length + solicitacoesVistoria.length
     };
 
     const scriptSql = generateRestorePointSQL(
@@ -1202,7 +1234,8 @@ export const dbService = {
       autor,
       ocorrencias,
       passagens,
-      solicitacoesDesconto
+      solicitacoesDesconto,
+      solicitacoesVistoria
     );
 
     const novoPonto: PontoRestauracao = {
@@ -1215,7 +1248,8 @@ export const dbService = {
       dados: {
         ocorrencias,
         passagens,
-        solicitacoesDesconto
+        solicitacoesDesconto,
+        solicitacoesVistoria
       },
       scriptSql
     };
@@ -1314,12 +1348,16 @@ export const dbService = {
       // Limpeza dos dados de Solicitações de Desconto
       await discountService.clearAllData();
 
+      // Limpeza dos dados de Solicitações de Vistoria
+      await inspectionService.clearAllData();
+
       // Limpeza no Supabase
       if (isSupabaseConfigured && supabase) {
         try {
           await supabase.from('ocorrencias').delete().neq('id', '___filtro_placeholder___');
           await supabase.from('resumos_passagem').delete().neq('id', '___filtro_placeholder___');
           await supabase.from('solicitacoes_desconto').delete().neq('id', '___filtro_placeholder___');
+          await supabase.from('solicitacoes_vistoria').delete().neq('id', '___filtro_placeholder___');
         } catch (dbErr) {
           console.error('Aviso ao deletar linhas no Supabase:', dbErr);
         }
@@ -1342,7 +1380,7 @@ export const dbService = {
   /**
    * RECUPERA E RESTAURA UM PONTO DE BACKUP:
    * 1. Valida senha de segurança administrativa
-   * 2. Repovoa todas as tabelas (ocorrencias, resumos_passagem, solicitacoes_desconto) no Supabase e LocalStorage
+   * 2. Repovoa todas as tabelas (ocorrencias, resumos_passagem, solicitacoes_desconto, solicitacoes_vistoria) no Supabase e LocalStorage
    */
   async restaurarPonto(
     pontoId: string,
@@ -1371,7 +1409,7 @@ export const dbService = {
     }
 
     try {
-      const { ocorrencias = [], passagens = [], solicitacoesDesconto = [] } = pontoAlvo.dados;
+      const { ocorrencias = [], passagens = [], solicitacoesDesconto = [], solicitacoesVistoria = [] } = pontoAlvo.dados;
 
       // 1. Restaura Ocorrências
       setLocalOcorrencias(ocorrencias);
@@ -1383,8 +1421,14 @@ export const dbService = {
       } catch (e) {
         console.error('Erro ao gravar descontos no LocalStorage:', e);
       }
+      // 4. Restaura Vistorias
+      try {
+        localStorage.setItem('diario_bordo_solicitacoes_vistoria_v1', JSON.stringify(solicitacoesVistoria));
+      } catch (e) {
+        console.error('Erro ao gravar vistorias no LocalStorage:', e);
+      }
 
-      // 4. Grava no Supabase se conectado
+      // 5. Grava no Supabase se conectado
       if (isSupabaseConfigured && supabase) {
         if (ocorrencias.length > 0) {
           const ocPayloads = ocorrencias.map(mapOcorrenciaToDB);
@@ -1398,9 +1442,13 @@ export const dbService = {
           const descPayloads = solicitacoesDesconto.map(mapSolicitacaoToDB);
           await supabase.from('solicitacoes_desconto').upsert(descPayloads, { onConflict: 'id' });
         }
+        if (solicitacoesVistoria.length > 0) {
+          const vistPayloads = solicitacoesVistoria.map(mapVistoriaToDB);
+          await supabase.from('solicitacoes_vistoria').upsert(vistPayloads, { onConflict: 'id' });
+        }
       }
 
-      const totalRestaurado = ocorrencias.length + passagens.length + solicitacoesDesconto.length;
+      const totalRestaurado = ocorrencias.length + passagens.length + solicitacoesDesconto.length + solicitacoesVistoria.length;
 
       return {
         success: true,
