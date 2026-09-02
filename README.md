@@ -192,4 +192,5 @@ VITE_SUPABASE_ANON_KEY=sua-anon-key
 ### Autorização e Perfis
 - **Aprovação de Descontos e Liberações Gerenciais:** Perfil Gerencial (Heder Santos).
 - **Vistorias e Laudos Técnicos:** Vistoriadores Danilo e Lucas / Supervisão.
-- **Manutenção e Reset do Banco de Dados:** Senha Administrativa de Segurança com geração de ponto de restauração instantâneo.
+- **Exclusão de Registros (Vistorias e Descontos) & Manutenção do Banco:** Senha Administrativa de Segurança com validação criptográfica SHA-256 e proteção contra ataques de canal lateral (Timing Attacks).
+
