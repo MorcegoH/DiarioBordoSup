@@ -14,7 +14,7 @@ interface PasswordManagerSectionProps {
 }
 
 export const PasswordManagerSection: React.FC<PasswordManagerSectionProps> = ({ currentUser }) => {
-  const [selectedTarget, setSelectedTarget] = useState<'heder.santos' | 'debora.rodrigues'>('heder.santos');
+  const [selectedTarget, setSelectedTarget] = useState<'heder.santos' | 'debora.rodrigues' | 'erick.thomas'>('heder.santos');
   const [newPassword, setNewPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
@@ -125,7 +125,7 @@ export const PasswordManagerSection: React.FC<PasswordManagerSectionProps> = ({ 
           <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
             Selecione a Conta para Redefinir a Senha:
           </label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <button
               type="button"
               onClick={() => {
@@ -167,6 +167,27 @@ export const PasswordManagerSection: React.FC<PasswordManagerSectionProps> = ({ 
                 <CheckCircle2 className="w-4 h-4 text-[#005b2e]" />
               )}
             </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedTarget('erick.thomas');
+                setFeedback(null);
+              }}
+              className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between ${
+                selectedTarget === 'erick.thomas'
+                  ? 'border-sky-600 bg-sky-50 text-sky-950 font-bold ring-2 ring-sky-600/20'
+                  : 'border-gray-200 bg-gray-50/50 hover:bg-gray-100 text-gray-700'
+              }`}
+            >
+              <div>
+                <div className="text-xs font-bold">Erick Thomas</div>
+                <div className="text-[11px] text-sky-800 font-medium">Conta: erick.thomas (Apoio à Supervisão)</div>
+              </div>
+              {selectedTarget === 'erick.thomas' && (
+                <CheckCircle2 className="w-4 h-4 text-sky-600" />
+              )}
+            </button>
           </div>
         </div>
 
@@ -174,7 +195,7 @@ export const PasswordManagerSection: React.FC<PasswordManagerSectionProps> = ({ 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1" htmlFor="new-pass-input">
-              Nova Senha para {selectedTarget === 'heder.santos' ? 'Heder Santos' : 'Débora Rodrigues'}
+              Nova Senha para {selectedTarget === 'heder.santos' ? 'Heder Santos' : selectedTarget === 'erick.thomas' ? 'Erick Thomas' : 'Débora Rodrigues'}
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">

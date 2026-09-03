@@ -7,6 +7,7 @@
 import { SolicitacaoVistoria, StatusVistoria, Vistoriador } from '../types';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { sanitizeTextInput } from '../utils/security';
+import { safeLocalStorageSetItem, safeLocalStorageGetJSON } from '../utils/safeStorage';
 import { validarPlacaVeiculo } from '../data/discountData';
 
 const LOCAL_STORAGE_KEY = 'diario_bordo_solicitacoes_vistoria_v1';
@@ -73,111 +74,42 @@ export function mapVistoriaToDB(item: SolicitacaoVistoria) {
   };
 }
 
-/**
- * Dados iniciais de demonstração caso o banco esteja vazio
- */
-function getInitialMockVistorias(): SolicitacaoVistoria[] {
-  const hoje = new Date();
-  const hojeStr = hoje.toISOString().split('T')[0];
-  
-  const amanha = new Date(hoje);
-  amanha.setDate(amanha.getDate() + 1);
-  const amanhaStr = amanha.toISOString().split('T')[0];
+const EXAMPLE_IDS = new Set(['vis-101', 'vis-102', 'vis-103']);
 
-  return [
-    {
-      id: 'vis-101',
-      dataHoraSolicitacao: new Date(Date.now() - 3600000 * 4).toISOString(),
-      dataVistoria: hojeStr,
-      horarioVistoria: '14:30',
-      valorAdesao: 250.00,
-      adesaoPaga: true,
-      vistoriador: 'Danilo',
-      nomeAssociado: 'Carlos Eduardo Silveira',
-      contato: '(11) 98765-4321',
-      localizacaoMaps: 'https://maps.google.com/?q=-23.550520,-46.633308',
-      modeloCarro: 'Toyota Corolla 2.0 XEi',
-      placa: 'BRA2E19',
-      tipoPlaca: 'Mercosul',
-      linkVistoria: 'https://vistoria.sistema-externo.com/laudo/vis-101',
-      linkPagamento: 'https://pagamento.sistema-externo.com/fatura/pag-8891',
-      solicitante: 'Débora Rodrigues',
-      status: 'Aguardando Vistoria'
-    },
-    {
-      id: 'vis-102',
-      dataHoraSolicitacao: new Date(Date.now() - 3600000 * 8).toISOString(),
-      dataVistoria: hojeStr,
-      horarioVistoria: '16:00',
-      valorAdesao: 200.00,
-      adesaoPaga: false,
-      vistoriador: 'Lucas',
-      nomeAssociado: 'Mariana Ferreira Gomes',
-      contato: '(11) 97123-8899',
-      localizacaoMaps: 'https://maps.google.com/?q=-23.561684,-46.655981',
-      modeloCarro: 'Hyundai HB20 1.0 Comfort',
-      placa: 'ABC1234',
-      tipoPlaca: 'Tradicional',
-      linkVistoria: 'https://vistoria.sistema-externo.com/laudo/vis-102',
-      linkPagamento: 'https://pagamento.sistema-externo.com/fatura/pag-8892',
-      solicitante: 'Heder Santos',
-      status: 'Aguardando Vistoria'
-    },
-    {
-      id: 'vis-103',
-      dataHoraSolicitacao: new Date(Date.now() - 3600000 * 24).toISOString(),
-      dataVistoria: hojeStr,
-      horarioVistoria: '10:00',
-      valorAdesao: 300.00,
-      adesaoPaga: true,
-      vistoriador: 'Danilo',
-      nomeAssociado: 'Roberto Albuquerque Neto',
-      contato: '(11) 99887-1122',
-      localizacaoMaps: 'https://maps.google.com/?q=-23.587416,-46.682125',
-      modeloCarro: 'Honda Civic 1.5 Touring',
-      placa: 'RTE4B99',
-      tipoPlaca: 'Mercosul',
-      linkVistoria: 'https://vistoria.sistema-externo.com/laudo/vis-103',
-      linkPagamento: 'https://pagamento.sistema-externo.com/fatura/pag-8893',
-      solicitante: 'Débora Rodrigues',
-      status: 'Aprovado',
-      dataHoraAprovacao: new Date(Date.now() - 3600000 * 2).toISOString(),
-      parecer: 'Vistoria presencial realizada com sucesso. Veículo em excelente estado de conservação, sem avarias e com chassi/motor conferidos.',
-      aprovador: 'Danilo (Vistoriador)'
-    }
-  ];
+/**
+ * Identifica se uma vistoria é um dado de exemplo/demonstração
+ */
+function isExemploVistoria(item: any): boolean {
+  if (!item) return false;
+  if (EXAMPLE_IDS.has(item.id)) return true;
+  if (item.placa === 'BRA2E19' && String(item.nomeAssociado || '').includes('Carlos Eduardo')) return true;
+  if (item.placa === 'ABC1234' && String(item.nomeAssociado || '').includes('Mariana Ferreira')) return true;
+  if (item.placa === 'RTE4B99' && String(item.nomeAssociado || '').includes('Roberto Albuquerque')) return true;
+  return false;
 }
 
 export const inspectionService = {
   /**
-   * Obtém as solicitações do LocalStorage
+   * Obtém as solicitações do LocalStorage (garantindo ausência de dados de exemplo)
    */
   getVistorias(): SolicitacaoVistoria[] {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
+    const parsed = safeLocalStorageGetJSON<SolicitacaoVistoria[]>(LOCAL_STORAGE_KEY, []);
+    if (Array.isArray(parsed)) {
+      const limpas = parsed.filter((item) => !isExemploVistoria(item));
+      if (limpas.length !== parsed.length) {
+        this.saveToLocalStorage(limpas);
       }
-    } catch (e) {
-      console.error('Erro ao ler solicitações de vistoria do LocalStorage:', e);
+      return limpas;
     }
-    const initial = getInitialMockVistorias();
-    this.saveToLocalStorage(initial);
-    return initial;
+    return [];
   },
 
   /**
-   * Salva lista no LocalStorage
+   * Salva lista no LocalStorage de forma resiliente contra estouro de cota
    */
   saveToLocalStorage(data: SolicitacaoVistoria[]): void {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
-    } catch (e) {
-      console.error('Erro ao gravar solicitações de vistoria no LocalStorage:', e);
-    }
+    const dadosFiltrados = (data || []).filter((item) => !isExemploVistoria(item));
+    safeLocalStorageSetItem(LOCAL_STORAGE_KEY, JSON.stringify(dadosFiltrados));
   },
 
   /**
@@ -188,6 +120,13 @@ export const inspectionService = {
 
     if (isSupabaseConfigured && supabase) {
       try {
+        // Remove quaisquer registros de exemplo que possam ter sido gravados no Supabase
+        try {
+          await supabase.from('solicitacoes_vistoria').delete().in('id', ['vis-101', 'vis-102', 'vis-103']);
+        } catch (delErr) {
+          // Exclusão preventiva de exemplos
+        }
+
         const { data, error } = await supabase
           .from('solicitacoes_vistoria')
           .select('*')
@@ -199,18 +138,9 @@ export const inspectionService = {
         }
 
         if (data && Array.isArray(data)) {
-          if (data.length === 0 && locais.length > 0) {
-            // Popula o Supabase se a tabela estiver vazia
-            try {
-              const payloads = locais.map(mapVistoriaToDB);
-              await supabase.from('solicitacoes_vistoria').upsert(payloads, { onConflict: 'id' });
-            } catch (seedErr) {
-              console.warn('Erro ao enviar seed de vistorias para o Supabase:', seedErr);
-            }
-            return locais;
-          }
-
-          const remotas = data.map(mapVistoriaFromDB);
+          const remotas = data
+            .map(mapVistoriaFromDB)
+            .filter((item) => !isExemploVistoria(item));
           this.saveToLocalStorage(remotas);
           return remotas;
         }

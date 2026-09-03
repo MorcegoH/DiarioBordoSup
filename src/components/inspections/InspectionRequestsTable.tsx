@@ -701,7 +701,7 @@ export const InspectionRequestsTable: React.FC<InspectionRequestsTableProps> = R
                           ) : (
                             <>
                               <DollarSign className="w-2.5 h-2.5" />
-                              <span>A receber</span>
+                              <span>A Receber</span>
                             </>
                           )}
                         </button>

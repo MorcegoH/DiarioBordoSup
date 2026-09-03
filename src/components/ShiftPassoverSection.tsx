@@ -382,7 +382,9 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
         (p.observacaoConclusao && p.observacaoConclusao.toLowerCase().includes(termo)) ||
         p.data.includes(termo);
 
-      const matchSupervisor = !filtroSupervisor || p.supervisor === filtroSupervisor;
+      const matchSupervisor = !filtroSupervisor || 
+        p.supervisor.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') === 
+        filtroSupervisor.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
       let matchStatus = true;
       if (filtroStatus === 'pendentes') {
@@ -657,7 +659,7 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
             >
               <option value="">Liderança</option>
               <option value="Heder Santos">Heder Santos (Gerente)</option>
-              <option value="Debora Rodrigues">Debora Rodrigues (Supervisora)</option>
+              <option value="Débora Rodrigues">Débora Rodrigues (Supervisora)</option>
             </select>
           </div>
         </div>
@@ -900,10 +902,10 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
                         <button
                           onClick={() => handleAbrirConclusao(p)}
                           className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-95"
-                          title="Marcar pendência como concluída e tabula a solução aplicada"
+                          title="Marcar pendência como concluída e tabular a solução aplicada"
                         >
                           <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Marcar como Concluído</span>
+                          <span>Marcar como Concluída</span>
                         </button>
                       )}
 
@@ -1203,7 +1205,7 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
                           className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-1 focus:ring-emerald-600"
                         >
                           <option value="Heder Santos">Heder Santos (Gerente de Vendas)</option>
-                          <option value="Debora Rodrigues">Debora Rodrigues (Supervisora)</option>
+                          <option value="Débora Rodrigues">Débora Rodrigues (Supervisora)</option>
                         </select>
                       </div>
 
@@ -1422,7 +1424,7 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
                   className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#005b2e] font-medium"
                 >
                   <option value="Heder Santos">Heder Santos (Gerente de Vendas)</option>
-                  <option value="Debora Rodrigues">Debora Rodrigues (Supervisora)</option>
+                  <option value="Débora Rodrigues">Débora Rodrigues (Supervisora)</option>
                 </select>
               </div>
 
@@ -1505,7 +1507,7 @@ export const ShiftPassoverSection: React.FC<ShiftPassoverSectionProps> = React.m
                   className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#005b2e]"
                 >
                   <option value="Heder Santos">Heder Santos (Gerente de Vendas)</option>
-                  <option value="Debora Rodrigues">Debora Rodrigues (Supervisora)</option>
+                  <option value="Débora Rodrigues">Débora Rodrigues (Supervisora)</option>
                 </select>
               </div>
 

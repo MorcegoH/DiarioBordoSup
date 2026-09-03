@@ -6,7 +6,7 @@
 
 import React, { useState } from 'react';
 import { Categoria, Impacto, Status, Ocorrencia } from '../types';
-import { PlusCircle, CheckCircle2, User, Tag, FileText, Activity, Wrench, ShieldAlert, AlertTriangle } from 'lucide-react';
+import { PlusCircle, CheckCircle2, User, Tag, FileText, Activity, Wrench, ShieldAlert, AlertTriangle, Loader2 } from 'lucide-react';
 import { sanitizeTextInput } from '../utils/security';
 import { DbOperationResult } from '../services/dbService';
 
@@ -33,6 +33,7 @@ export const OccurrenceForm: React.FC<OccurrenceFormProps> = React.memo(({
   const [impacto, setImpacto] = useState<Impacto>('Baixo');
   const [acaoTomada, setAcaoTomada] = useState<string>('');
   const [status, setStatus] = useState<Status>('Pendente');
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [saveStatus, setSaveStatus] = useState<{
     type: 'supabase' | 'local' | 'error' | null;
     message: string;
@@ -41,6 +42,7 @@ export const OccurrenceForm: React.FC<OccurrenceFormProps> = React.memo(({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
 
     const cleanSupervisor = sanitizeTextInput(supervisor, 100);
     const cleanDescricao = sanitizeTextInput(descricao, 2000);
@@ -61,51 +63,64 @@ export const OccurrenceForm: React.FC<OccurrenceFormProps> = React.memo(({
       return;
     }
 
-    const agora = new Date().toISOString();
-    const isResolvido = status === 'Resolvido';
+    setIsSubmitting(true);
 
-    const novaOcorrencia: Ocorrencia = {
-      id: 'oc-' + Date.now().toString(36),
-      dataHora: agora,
-      dataHoraConclusao: isResolvido ? agora : undefined,
-      supervisor: cleanSupervisor,
-      categoria,
-      descricao: cleanDescricao,
-      impacto,
-      acaoTomada: cleanAcaoTomada,
-      status,
-      duracaoMinutos: isResolvido ? 15 : 0
-    };
+    try {
+      const agora = new Date().toISOString();
+      const isResolvido = status === 'Resolvido';
 
-    const result = await onAddOcorrencia(novaOcorrencia);
+      const novaOcorrencia: Ocorrencia = {
+        id: 'oc-' + Date.now().toString(36),
+        dataHora: agora,
+        dataHoraConclusao: isResolvido ? agora : undefined,
+        supervisor: cleanSupervisor,
+        categoria,
+        descricao: cleanDescricao,
+        impacto,
+        acaoTomada: cleanAcaoTomada,
+        status,
+        duracaoMinutos: isResolvido ? 15 : 0
+      };
 
-    if (result && result.storage === 'supabase' && result.success) {
-      setSaveStatus({
-        type: 'supabase',
-        message: 'Ocorrência salva com sucesso no Supabase (Nuvem)!'
-      });
-    } else if (result && result.error) {
+      const result = await onAddOcorrencia(novaOcorrencia);
+
+      if (result && result.storage === 'supabase' && result.success) {
+        setSaveStatus({
+          type: 'supabase',
+          message: 'Ocorrência salva com sucesso no Supabase (Nuvem)!'
+        });
+      } else if (result && result.error) {
+        setSaveStatus({
+          type: 'error',
+          message: 'Salvo apenas no navegador. Erro na gravação do Supabase:',
+          errorDetail: result.error
+        });
+      } else {
+        setSaveStatus({
+          type: 'local',
+          message: 'Salvo localmente no navegador! (Supabase não configurado)'
+        });
+      }
+
+      // Reset form fields except supervisor
+      setDescricao('');
+      setAcaoTomada('');
+      setImpacto('Baixo');
+      setStatus('Pendente');
+
+      setTimeout(() => {
+        setSaveStatus({ type: null, message: '' });
+      }, 7000);
+    } catch (err) {
+      console.error('[OccurrenceForm] Erro ao submeter ocorrência:', err);
       setSaveStatus({
         type: 'error',
-        message: 'Salvo apenas no navegador. Erro na gravação do Supabase:',
-        errorDetail: result.error
+        message: 'Falha inesperada ao salvar ocorrência.',
+        errorDetail: String(err)
       });
-    } else {
-      setSaveStatus({
-        type: 'local',
-        message: 'Salvo localmente no navegador! (Supabase não configurado)'
-      });
+    } finally {
+      setIsSubmitting(false);
     }
-
-    // Reset form fields except supervisor
-    setDescricao('');
-    setAcaoTomada('');
-    setImpacto('Baixo');
-    setStatus('Pendente');
-
-    setTimeout(() => {
-      setSaveStatus({ type: null, message: '' });
-    }, 7000);
   };
 
   return (
@@ -272,10 +287,22 @@ export const OccurrenceForm: React.FC<OccurrenceFormProps> = React.memo(({
         <div className="flex justify-end pt-2">
           <button
             type="submit"
-            className="w-full sm:w-auto px-6 py-2.5 bg-primary-green hover:bg-primary-dark text-white font-bold text-sm rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-95"
+            disabled={isSubmitting}
+            className={`w-full sm:w-auto px-6 py-2.5 bg-primary-green hover:bg-primary-dark text-white font-bold text-sm rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 ${
+              isSubmitting ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer active:scale-95'
+            }`}
           >
-            <PlusCircle className="w-4 h-4" />
-            <span>Registrar Ocorrência</span>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Gravando Ocorrência...</span>
+              </>
+            ) : (
+              <>
+                <PlusCircle className="w-4 h-4" />
+                <span>Registrar Ocorrência</span>
+              </>
+            )}
           </button>
         </div>
       </form>

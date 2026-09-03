@@ -8,6 +8,7 @@ import { SolicitacaoDesconto, BudgetState, BudgetCycleInfo } from '../types';
 import { BUDGET_LIMITS } from '../data/discountData';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { sanitizeTextInput } from '../utils/security';
+import { safeLocalStorageSetItem, safeLocalStorageGetJSON } from '../utils/safeStorage';
 
 const LOCAL_STORAGE_KEY = 'diario_bordo_solicitacoes_desconto_v1';
 
@@ -136,34 +137,23 @@ class DiscountService {
    * Recupera a lista de solicitações de desconto salvas localmente
    */
   getLocalSolicitacoes(): SolicitacaoDesconto[] {
-    try {
-      const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          // Filtra itens de teste antigos se existirem
-          const limpos = parsed.filter(item => !item.id?.startsWith('desc-20260815-') && !item.id?.startsWith('desc-20260814-') && !item.id?.startsWith('desc-20260813-'));
-          if (limpos.length !== parsed.length) {
-            this.saveToStorage(limpos);
-          }
-          return limpos;
-        }
+    const parsed = safeLocalStorageGetJSON<SolicitacaoDesconto[]>(LOCAL_STORAGE_KEY, []);
+    if (Array.isArray(parsed)) {
+      // Filtra itens de teste antigos se existirem
+      const limpos = parsed.filter(item => !item.id?.startsWith('desc-20260815-') && !item.id?.startsWith('desc-20260814-') && !item.id?.startsWith('desc-20260813-'));
+      if (limpos.length !== parsed.length) {
+        this.saveToStorage(limpos);
       }
-    } catch (e) {
-      console.error('Erro ao ler solicitações de desconto do localStorage:', e);
+      return limpos;
     }
     return [];
   }
 
   /**
-   * Salva a lista no LocalStorage
+   * Salva a lista no LocalStorage de forma resiliente contra estouro de cota
    */
   private saveToStorage(solicitacoes: SolicitacaoDesconto[]): void {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(solicitacoes));
-    } catch (e) {
-      console.error('Erro ao salvar solicitações de desconto no localStorage:', e);
-    }
+    safeLocalStorageSetItem(LOCAL_STORAGE_KEY, JSON.stringify(solicitacoes));
   }
 
   /**

@@ -34,7 +34,7 @@ export const OccurrenceHistory: React.FC<OccurrenceHistoryProps> = React.memo(({
   
   // Card de Trabalho & Acompanhamento
   const [selectedWorkCard, setSelectedWorkCard] = useState<Ocorrencia | null>(null);
-  const [supervisorNovoAndamento, setSupervisorNovoAndamento] = useState<string>('Debora Rodrigues');
+  const [supervisorNovoAndamento, setSupervisorNovoAndamento] = useState<string>('Débora Rodrigues');
   const [novaObservacaoAndamento, setNovaObservacaoAndamento] = useState<string>('');
 
   const handleAddAndamento = useCallback(() => {
@@ -100,7 +100,9 @@ export const OccurrenceHistory: React.FC<OccurrenceHistoryProps> = React.memo(({
       const matchCategoria = !filtros.categoria || oc.categoria === filtros.categoria;
       const matchImpacto = !filtros.impacto || oc.impacto === filtros.impacto;
       const matchStatus = !filtros.status || oc.status === filtros.status;
-      const matchSupervisor = !filtros.supervisor || oc.supervisor === filtros.supervisor;
+      const matchSupervisor = !filtros.supervisor || 
+        oc.supervisor.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') === 
+        filtros.supervisor.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
       return matchBusca && matchCategoria && matchImpacto && matchStatus && matchSupervisor;
     });
@@ -265,7 +267,7 @@ export const OccurrenceHistory: React.FC<OccurrenceHistoryProps> = React.memo(({
             >
               <option value="">Liderança</option>
               <option value="Heder Santos">Heder Santos (Gerente)</option>
-              <option value="Debora Rodrigues">Debora Rodrigues (Supervisora)</option>
+              <option value="Débora Rodrigues">Débora Rodrigues (Supervisora)</option>
             </select>
           </div>
         </div>
@@ -715,8 +717,8 @@ export const OccurrenceHistory: React.FC<OccurrenceHistoryProps> = React.memo(({
                       className="w-full px-2.5 py-1.5 bg-white border border-blue-300 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-600"
                     >
                       <option value="Heder Santos">Heder Santos (Gerente)</option>
-                      <option value="Debora Rodrigues">Debora Rodrigues</option>
-                      <option value="Marilia Farias">Marilia Farias</option>
+                      <option value="Débora Rodrigues">Débora Rodrigues</option>
+                      <option value="Marília Farias">Marília Farias</option>
                     </select>
                   </div>
 
@@ -858,7 +860,7 @@ export const OccurrenceHistory: React.FC<OccurrenceHistoryProps> = React.memo(({
                   className="w-full px-3 py-2 border rounded-md"
                 >
                   <option value="Heder Santos">Heder Santos (Gerente)</option>
-                  <option value="Debora Rodrigues">Debora Rodrigues (Supervisora)</option>
+                  <option value="Débora Rodrigues">Débora Rodrigues (Supervisora)</option>
                 </select>
               </div>
 

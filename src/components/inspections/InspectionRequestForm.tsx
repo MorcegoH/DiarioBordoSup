@@ -161,7 +161,7 @@ export const InspectionRequestForm: React.FC<InspectionRequestFormProps> = React
         localizacaoMaps: cleanMaps,
         modeloCarro: cleanModelo,
         placa: placaInput.toUpperCase(),
-        tipoPlaca: validacaoPlaca.tipo,
+        tipoPlaca: validacaoPlaca.formato === 'Mercosul' ? 'Mercosul' : validacaoPlaca.formato === 'Antigo' ? 'Tradicional' : 'Inválida',
         linkVistoria: cleanLinkVis,
         linkPagamento: cleanLinkPag,
         solicitante: currentUser?.name || 'Inside Sales',
@@ -419,7 +419,7 @@ export const InspectionRequestForm: React.FC<InspectionRequestFormProps> = React
                         : 'bg-red-100 text-red-800 border-red-300'
                     }`}
                   >
-                    {validacaoPlaca.tipo}
+                    {validacaoPlaca.formato === 'Antigo' ? 'Tradicional' : validacaoPlaca.formato}
                   </span>
                 )}
               </div>

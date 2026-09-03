@@ -1,6 +1,6 @@
 {
   "name": "Diário de Bordo - I.S",
-  "description": "Gestão Operacional do Departametno Inside Sales",
+  "description": "Gestão Operacional do Departamento Inside Sales",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

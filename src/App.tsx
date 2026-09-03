@@ -23,6 +23,8 @@ import { exportToCSV, exportPassagensToCSV } from './utils/statisticalAnalysis';
 import { exportarDescontosCSV } from './data/discountData';
 import { exportarVistoriasCSV } from './utils/csvInspectionExport';
 import { useInactivityTimeout } from './hooks/useInactivityTimeout';
+import { useNetworkStatus } from './hooks/useNetworkStatus';
+import { WifiOff, Wifi, RefreshCw } from 'lucide-react';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => authService.getCurrentUser());
@@ -63,7 +65,19 @@ export default function App() {
   // Handler de Sucesso de Login
   const handleLoginSuccess = useCallback((user: AuthUser) => {
     setCurrentUser(user);
+    if (user.role === 'apoio') {
+      setActiveTab('vistoria');
+    }
   }, []);
+
+  // Restrição de acesso estrita para a função de Apoio à Supervisão (apenas Vistoria e Dashboard BI)
+  useEffect(() => {
+    if (currentUser?.role === 'apoio') {
+      if (activeTab !== 'vistoria' && activeTab !== 'dashboard') {
+        setActiveTab('vistoria');
+      }
+    }
+  }, [currentUser, activeTab]);
 
   // Carrega os dados iniciais do Supabase ou do LocalStorage
   const loadInitialData = useCallback(async () => {
@@ -85,6 +99,11 @@ export default function App() {
   useEffect(() => {
     loadInitialData();
   }, [loadInitialData]);
+
+  // Monitoramento de conexão em tempo real: sincroniza automaticamente ao reconectar
+  const { isOnline, wasOffline } = useNetworkStatus({
+    onReconnect: loadInitialData
+  });
 
   // Handlers sincronizados com o dbService
   const handleAddOcorrencia = useCallback(async (nova: Ocorrencia) => {
@@ -214,8 +233,42 @@ export default function App() {
       {/* Main Container */}
       <main className="flex-grow w-full max-w-[1800px] mx-auto px-3 sm:px-6 lg:px-8 xl:px-10 py-4 sm:py-6 pb-24 md:pb-8">
         
-        {/* Guia 1: Ocorrências & Registro */}
-        {activeTab === 'ocorrencias' && (
+        {/* Banner de Contingência de Rede (Offline) */}
+        {!isOnline && (
+          <div className="mb-5 p-3.5 bg-amber-500/10 border-l-4 border-amber-500 rounded-r-lg text-amber-900 flex items-center justify-between text-xs sm:text-sm shadow-sm animate-pulse">
+            <div className="flex items-center space-x-2">
+              <WifiOff className="w-5 h-5 text-amber-600 flex-shrink-0" />
+              <span>
+                <strong>Modo Offline Ativo:</strong> Sem conexão com a internet detectada. Os dados continuam sendo salvos de forma segura e resiliente na memória local do seu navegador e serão sincronizados com a nuvem assim que a rede retornar.
+              </span>
+            </div>
+            <span className="ml-2 px-2 py-0.5 bg-amber-200 text-amber-800 text-[10px] font-bold rounded uppercase tracking-wider whitespace-nowrap">
+              Offline
+            </span>
+          </div>
+        )}
+
+        {/* Notificação de Reconexão Bem-Sucedida */}
+        {isOnline && wasOffline && (
+          <div className="mb-5 p-3.5 bg-emerald-500/10 border-l-4 border-emerald-600 rounded-r-lg text-emerald-900 flex items-center justify-between text-xs sm:text-sm shadow-sm">
+            <div className="flex items-center space-x-2">
+              <Wifi className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+              <span>
+                <strong>Conexão Restabelecida:</strong> O acesso à rede voltou ao normal. A sincronização automática com o Supabase foi reativada.
+              </span>
+            </div>
+            <button
+              onClick={() => loadInitialData()}
+              className="ml-2 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded flex items-center space-x-1 cursor-pointer transition-colors"
+            >
+              <RefreshCw className="w-3 h-3 animate-spin" />
+              <span>Sincronizar</span>
+            </button>
+          </div>
+        )}
+
+        {/* Guia 1: Ocorrências & Registro (Apenas para Gestão e Supervisão) */}
+        {activeTab === 'ocorrencias' && currentUser.role !== 'apoio' && (
           <div className="space-y-4 sm:space-y-6">
             {/* SEÇÃO 2: Formulário de Registro (Nova Entrada) */}
             <OccurrenceForm 
@@ -233,23 +286,23 @@ export default function App() {
           </div>
         )}
 
-        {/* Guia 2: Solicitações de Desconto & Governança de Inside Sales */}
-        {activeTab === 'descontos' && (
+        {/* Guia 2: Solicitações de Desconto & Governança de Inside Sales (Apenas Gestão e Supervisão) */}
+        {activeTab === 'descontos' && currentUser.role !== 'apoio' && (
           <DiscountRequestsSection currentUser={currentUser} />
         )}
 
-        {/* Guia 3: Solicitações de Vistoria & Gestão Danilo e Lucas */}
+        {/* Guia 3: Solicitações de Vistoria & Gestão Danilo e Lucas (Liberado para Apoio, Supervisão e Gerência) */}
         {activeTab === 'vistoria' && (
           <InspectionRequestsSection currentUser={currentUser} />
         )}
 
-        {/* Guia 4: Dashboard BI & Z-Score Anomaly Engine */}
+        {/* Guia 4: Dashboard BI & Z-Score Anomaly Engine (Liberado para Apoio, Supervisão e Gerência) */}
         {activeTab === 'dashboard' && (
           <AnalyticsDashboard ocorrencias={ocorrencias} />
         )}
 
-        {/* Guia 5: SEÇÃO 5: Passagem de Bastão */}
-        {activeTab === 'passagem' && (
+        {/* Guia 5: SEÇÃO 5: Passagem de Bastão (Apenas Gestão e Supervisão) */}
+        {activeTab === 'passagem' && currentUser.role !== 'apoio' && (
           <ShiftPassoverSection
             ocorrencias={ocorrencias}
             passagens={passagens}
@@ -266,100 +319,144 @@ export default function App() {
 
       {/* Barra de Navegação Inferior Fixa Mobile (Estilo App Nativo) */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-lg px-2 py-1.5 pb-safe flex items-center justify-around">
-        <button
-          onClick={() => {
-            setActiveTab('ocorrencias');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
-            activeTab === 'ocorrencias'
-              ? 'text-[#005b2e] font-bold'
-              : 'text-gray-400 hover:text-gray-600'
-          }`}
-        >
-          <span className={`p-1 rounded-lg ${activeTab === 'ocorrencias' ? 'bg-emerald-100 text-[#005b2e]' : ''}`}>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-            </svg>
-          </span>
-          <span className="text-[10px] tracking-tight mt-0.5">Ocorrências</span>
-        </button>
+        {currentUser.role === 'apoio' ? (
+          <>
+            <button
+              onClick={() => {
+                setActiveTab('vistoria');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className={`flex flex-col items-center justify-center py-1 px-4 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
+                activeTab === 'vistoria'
+                  ? 'text-[#005b2e] font-bold'
+                  : 'text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              <span className={`p-1 rounded-lg ${activeTab === 'vistoria' ? 'bg-emerald-100 text-[#005b2e]' : ''}`}>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 19H5a2 2 0 01-2-2V7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2zM9 15h6M7 11h10" />
+                </svg>
+              </span>
+              <span className="text-[10px] tracking-tight mt-0.5">Vistorias</span>
+            </button>
 
-        <button
-          onClick={() => {
-            setActiveTab('descontos');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
-            activeTab === 'descontos'
-              ? 'text-[#005b2e] font-bold'
-              : 'text-gray-400 hover:text-gray-600'
-          }`}
-        >
-          <span className={`p-1 rounded-lg ${activeTab === 'descontos' ? 'bg-emerald-100 text-[#005b2e]' : ''}`}>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-            </svg>
-          </span>
-          <span className="text-[10px] tracking-tight mt-0.5">Descontos</span>
-        </button>
+            <button
+              onClick={() => {
+                setActiveTab('dashboard');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className={`flex flex-col items-center justify-center py-1 px-4 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
+                activeTab === 'dashboard'
+                  ? 'text-[#005b2e] font-bold'
+                  : 'text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              <span className={`p-1 rounded-lg ${activeTab === 'dashboard' ? 'bg-emerald-100 text-[#005b2e]' : ''}`}>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </span>
+              <span className="text-[10px] tracking-tight mt-0.5">Dashboard BI</span>
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={() => {
+                setActiveTab('ocorrencias');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
+                activeTab === 'ocorrencias'
+                  ? 'text-[#005b2e] font-bold'
+                  : 'text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              <span className={`p-1 rounded-lg ${activeTab === 'ocorrencias' ? 'bg-emerald-100 text-[#005b2e]' : ''}`}>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                </svg>
+              </span>
+              <span className="text-[10px] tracking-tight mt-0.5">Ocorrências</span>
+            </button>
 
-        <button
-          onClick={() => {
-            setActiveTab('vistoria');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
-            activeTab === 'vistoria'
-              ? 'text-[#005b2e] font-bold'
-              : 'text-gray-400 hover:text-gray-600'
-          }`}
-        >
-          <span className={`p-1 rounded-lg ${activeTab === 'vistoria' ? 'bg-emerald-100 text-[#005b2e]' : ''}`}>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 19H5a2 2 0 01-2-2V7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2zM9 15h6M7 11h10" />
-            </svg>
-          </span>
-          <span className="text-[10px] tracking-tight mt-0.5">Vistorias</span>
-        </button>
+            <button
+              onClick={() => {
+                setActiveTab('descontos');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
+                activeTab === 'descontos'
+                  ? 'text-[#005b2e] font-bold'
+                  : 'text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              <span className={`p-1 rounded-lg ${activeTab === 'descontos' ? 'bg-emerald-100 text-[#005b2e]' : ''}`}>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+              </span>
+              <span className="text-[10px] tracking-tight mt-0.5">Descontos</span>
+            </button>
 
-        <button
-          onClick={() => {
-            setActiveTab('dashboard');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
-            activeTab === 'dashboard'
-              ? 'text-[#005b2e] font-bold'
-              : 'text-gray-400 hover:text-gray-600'
-          }`}
-        >
-          <span className={`p-1 rounded-lg ${activeTab === 'dashboard' ? 'bg-emerald-100 text-[#005b2e]' : ''}`}>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-          </span>
-          <span className="text-[10px] tracking-tight mt-0.5">BI & Métricas</span>
-        </button>
+            <button
+              onClick={() => {
+                setActiveTab('vistoria');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
+                activeTab === 'vistoria'
+                  ? 'text-[#005b2e] font-bold'
+                  : 'text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              <span className={`p-1 rounded-lg ${activeTab === 'vistoria' ? 'bg-emerald-100 text-[#005b2e]' : ''}`}>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 19H5a2 2 0 01-2-2V7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2zM9 15h6M7 11h10" />
+                </svg>
+              </span>
+              <span className="text-[10px] tracking-tight mt-0.5">Vistorias</span>
+            </button>
 
-        <button
-          onClick={() => {
-            setActiveTab('passagem');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
-            activeTab === 'passagem'
-              ? 'text-[#005b2e] font-bold'
-              : 'text-gray-400 hover:text-gray-600'
-          }`}
-        >
-          <span className={`p-1 rounded-lg ${activeTab === 'passagem' ? 'bg-emerald-100 text-[#005b2e]' : ''}`}>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          </span>
-          <span className="text-[10px] tracking-tight mt-0.5">Turno</span>
-        </button>
+            <button
+              onClick={() => {
+                setActiveTab('dashboard');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
+                activeTab === 'dashboard'
+                  ? 'text-[#005b2e] font-bold'
+                  : 'text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              <span className={`p-1 rounded-lg ${activeTab === 'dashboard' ? 'bg-emerald-100 text-[#005b2e]' : ''}`}>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </span>
+              <span className="text-[10px] tracking-tight mt-0.5">BI & Métricas</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab('passagem');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
+                activeTab === 'passagem'
+                  ? 'text-[#005b2e] font-bold'
+                  : 'text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              <span className={`p-1 rounded-lg ${activeTab === 'passagem' ? 'bg-emerald-100 text-[#005b2e]' : ''}`}>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </span>
+              <span className="text-[10px] tracking-tight mt-0.5">Turno</span>
+            </button>
+          </>
+        )}
       </div>
 
       {/* Footer Corporativo */}

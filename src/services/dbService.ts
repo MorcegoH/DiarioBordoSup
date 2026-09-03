@@ -7,6 +7,7 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { Ocorrencia, ResumoPassagem, Status, ComentarioPassagem, PontoRestauracao, SolicitacaoDesconto, SolicitacaoVistoria } from '../types';
 import { sanitizeTextInput, verificarSenhaGerente } from '../utils/security';
+import { safeLocalStorageSetItem, safeLocalStorageGetJSON } from '../utils/safeStorage';
 import { discountService, mapSolicitacaoToDB } from './discountService';
 import { inspectionService, mapVistoriaToDB } from './inspectionService';
 
@@ -177,66 +178,27 @@ let lastHealthStatus: DbHealthStatus = {
 };
 
 function getLocalOcorrencias(): Ocorrencia[] {
-  try {
-    const saved = localStorage.getItem(LOCAL_KEY_OCORRENCIAS);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch (e) {
-    console.error('Erro ao carregar ocorrencias locais:', e);
-  }
-  return [];
+  return safeLocalStorageGetJSON<Ocorrencia[]>(LOCAL_KEY_OCORRENCIAS, []);
 }
 
 function setLocalOcorrencias(data: Ocorrencia[]) {
-  try {
-    localStorage.setItem(LOCAL_KEY_OCORRENCIAS, JSON.stringify(data));
-  } catch (e) {
-    console.error('Erro ao salvar ocorrencias locais:', e);
-  }
+  safeLocalStorageSetItem(LOCAL_KEY_OCORRENCIAS, JSON.stringify(data));
 }
 
 function getLocalPassagens(): ResumoPassagem[] {
-  try {
-    const saved = localStorage.getItem(LOCAL_KEY_PASSAGENS);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch (e) {
-    console.error('Erro ao carregar passagens locais:', e);
-  }
-  return [];
+  return safeLocalStorageGetJSON<ResumoPassagem[]>(LOCAL_KEY_PASSAGENS, []);
 }
 
 function setLocalPassagens(data: ResumoPassagem[]) {
-  try {
-    localStorage.setItem(LOCAL_KEY_PASSAGENS, JSON.stringify(data));
-  } catch (e) {
-    console.error('Erro ao salvar passagens locais:', e);
-  }
+  safeLocalStorageSetItem(LOCAL_KEY_PASSAGENS, JSON.stringify(data));
 }
 
 function getLocalSnapshots(): PontoRestauracao[] {
-  try {
-    const saved = localStorage.getItem(LOCAL_KEY_SNAPSHOTS);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch (e) {
-    console.error('Erro ao carregar snapshots de backup locais:', e);
-  }
-  return [];
+  return safeLocalStorageGetJSON<PontoRestauracao[]>(LOCAL_KEY_SNAPSHOTS, []);
 }
 
 function setLocalSnapshots(data: PontoRestauracao[]) {
-  try {
-    localStorage.setItem(LOCAL_KEY_SNAPSHOTS, JSON.stringify(data));
-  } catch (e) {
-    console.error('Erro ao salvar snapshots de backup locais:', e);
-  }
+  safeLocalStorageSetItem(LOCAL_KEY_SNAPSHOTS, JSON.stringify(data));
 }
 
 function generateRestorePointSQL(
@@ -583,7 +545,7 @@ export const dbService = {
           .order('data_hora', { ascending: false });
 
         if (error) {
-          console.warn('Erro ao carregar ocorrencias do Supabase, fallback para LocalStorage:', error.message);
+          console.warn('Erro ao carregar ocorrências do Supabase, fallback para LocalStorage:', error.message);
           lastHealthStatus = {
             isConnected: false,
             errorCode: error.code || 'PGRST_ERROR',
@@ -1416,17 +1378,9 @@ export const dbService = {
       // 2. Restaura Passagens
       setLocalPassagens(passagens);
       // 3. Restaura Descontos
-      try {
-        localStorage.setItem('diario_bordo_solicitacoes_desconto_v1', JSON.stringify(solicitacoesDesconto));
-      } catch (e) {
-        console.error('Erro ao gravar descontos no LocalStorage:', e);
-      }
+      safeLocalStorageSetItem('diario_bordo_solicitacoes_desconto_v1', JSON.stringify(solicitacoesDesconto));
       // 4. Restaura Vistorias
-      try {
-        localStorage.setItem('diario_bordo_solicitacoes_vistoria_v1', JSON.stringify(solicitacoesVistoria));
-      } catch (e) {
-        console.error('Erro ao gravar vistorias no LocalStorage:', e);
-      }
+      safeLocalStorageSetItem('diario_bordo_solicitacoes_vistoria_v1', JSON.stringify(solicitacoesVistoria));
 
       // 5. Grava no Supabase se conectado
       if (isSupabaseConfigured && supabase) {

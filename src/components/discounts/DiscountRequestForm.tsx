@@ -28,7 +28,8 @@ import {
   Lock,
   Calculator,
   AlertTriangle,
-  CalendarDays
+  CalendarDays,
+  Loader2
 } from 'lucide-react';
 
 interface DiscountRequestFormProps {
@@ -52,6 +53,7 @@ export const DiscountRequestForm: React.FC<DiscountRequestFormProps> = React.mem
   const [descontoValorAdesao, setDescontoValorAdesao] = useState<string>('30.00'); // Em R$
   const [descontoPercentualPlano, setDescontoPercentualPlano] = useState<string>('15'); // Em %
   const [justificativa, setJustificativa] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   
   const [feedbackSucesso, setFeedbackSucesso] = useState<string | null>(null);
 
@@ -108,7 +110,7 @@ export const DiscountRequestForm: React.FC<DiscountRequestFormProps> = React.mem
   }>({});
 
   // Submissão do Formulário
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const cleanCliente = sanitizeTextInput(cliente, 150);
@@ -159,42 +161,51 @@ export const DiscountRequestForm: React.FC<DiscountRequestFormProps> = React.mem
       return;
     }
 
-    const novaSolicitacao: SolicitacaoDesconto = {
-      id: `desc-${Date.now().toString(36)}-${Math.floor(Math.random() * 1000)}`,
-      dataHoraSolicitacao: new Date().toISOString(),
-      cliente: cleanCliente,
-      supervisora,
-      consultor,
-      placa: validacaoPlaca.formatada,
-      tipoDesconto,
-      valorCheio: calculosFinanceiros.valorCheio,
-      descontoInput: calculosFinanceiros.descontoInput,
-      valorDescontoCalculado: calculosFinanceiros.valorDescontoCalculado,
-      percentualDesconto: calculosFinanceiros.percentualDesconto,
-      valorFinal: calculosFinanceiros.valorFinal,
-      justificativa: cleanJustificativa,
-      status: 'Aguardando Aprovação'
-    };
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
-    onAddSolicitacao(novaSolicitacao);
+    try {
+      const novaSolicitacao: SolicitacaoDesconto = {
+        id: `desc-${Date.now().toString(36)}-${Math.floor(Math.random() * 1000)}`,
+        dataHoraSolicitacao: new Date().toISOString(),
+        cliente: cleanCliente,
+        supervisora,
+        consultor,
+        placa: validacaoPlaca.formatada,
+        tipoDesconto,
+        valorCheio: calculosFinanceiros.valorCheio,
+        descontoInput: calculosFinanceiros.descontoInput,
+        valorDescontoCalculado: calculosFinanceiros.valorDescontoCalculado,
+        percentualDesconto: calculosFinanceiros.percentualDesconto,
+        valorFinal: calculosFinanceiros.valorFinal,
+        justificativa: cleanJustificativa,
+        status: 'Aguardando Aprovação'
+      };
 
-    // Feedback visual
-    setFeedbackSucesso(`Solicitação enviada com sucesso! Encaminhada para a fila de aprovação do Gerente Heder Santos (SLA: 4 horas).`);
-    
-    // Limpar campos
-    setCliente('');
-    setPlacaInput('');
-    setJustificativa('');
-    setErrosObrigatorios({});
-    if (tipoDesconto === 'Adesão') {
-      setDescontoValorAdesao('20.00');
-    } else {
-      setDescontoPercentualPlano('10');
+      await onAddSolicitacao(novaSolicitacao);
+
+      // Feedback visual
+      setFeedbackSucesso(`Solicitação enviada com sucesso! Encaminhada para a fila de aprovação do Gerente Heder Santos (SLA: 4 horas).`);
+      
+      // Limpar campos
+      setCliente('');
+      setPlacaInput('');
+      setJustificativa('');
+      setErrosObrigatorios({});
+      if (tipoDesconto === 'Adesão') {
+        setDescontoValorAdesao('20.00');
+      } else {
+        setDescontoPercentualPlano('10');
+      }
+
+      setTimeout(() => {
+        setFeedbackSucesso(null);
+      }, 6000);
+    } catch (err) {
+      console.error('[DiscountRequestForm] Erro ao enviar solicitação:', err);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setTimeout(() => {
-      setFeedbackSucesso(null);
-    }, 6000);
   };
 
   return (
@@ -678,15 +689,24 @@ export const DiscountRequestForm: React.FC<DiscountRequestFormProps> = React.mem
 
           <button
             type="submit"
-            disabled={calculosFinanceiros.excedeTeto || saldoInsuficiente || !validacaoPlaca.valida || !cliente.trim() || !justificativa.trim()}
-            className={`w-full sm:w-auto px-6 py-2.5 font-bold text-sm rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer select-none ${
-              calculosFinanceiros.excedeTeto || saldoInsuficiente || !validacaoPlaca.valida || !cliente.trim() || !justificativa.trim()
+            disabled={isSubmitting || calculosFinanceiros.excedeTeto || saldoInsuficiente || !validacaoPlaca.valida || !cliente.trim() || !justificativa.trim()}
+            className={`w-full sm:w-auto px-6 py-2.5 font-bold text-sm rounded-lg shadow-md transition-all flex items-center justify-center space-x-2 select-none ${
+              isSubmitting || calculosFinanceiros.excedeTeto || saldoInsuficiente || !validacaoPlaca.valida || !cliente.trim() || !justificativa.trim()
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none'
-                : 'bg-primary-green hover:bg-emerald-800 text-white active:scale-95'
+                : 'bg-primary-green hover:bg-emerald-800 text-white cursor-pointer active:scale-95'
             }`}
           >
-            <Send className="w-4 h-4" />
-            <span>Enviar Solicitação para Aprovação</span>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Enviando Solicitação...</span>
+              </>
+            ) : (
+              <>
+                <Send className="w-4 h-4" />
+                <span>Enviar Solicitação para Aprovação</span>
+              </>
+            )}
           </button>
         </div>
 

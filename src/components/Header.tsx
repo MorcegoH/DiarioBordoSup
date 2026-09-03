@@ -82,6 +82,8 @@ export const Header: React.FC<HeaderProps> = React.memo(({
     setIsErrorModalOpen(true);
   };
 
+  const isApoio = currentUser?.role === 'apoio';
+
   return (
     <header className="bg-primary-green text-white shadow-md border-b border-green-900 w-full">
       {/* Top Banner */}
@@ -94,11 +96,11 @@ export const Header: React.FC<HeaderProps> = React.memo(({
               href="/"
               onClick={(e) => {
                 e.preventDefault();
-                setActiveTab('ocorrencias');
+                setActiveTab(isApoio ? 'vistoria' : 'ocorrencias');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               className="p-2.5 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20 hover:bg-white/20 transition-colors cursor-pointer"
-              title="Ir para a Página Inicial (Diário de Bordo)"
+              title={isApoio ? "Ir para Solicitação de Vistoria" : "Ir para a Página Inicial (Diário de Bordo)"}
             >
               <ShieldCheck className="w-8 h-8 text-emerald-300" />
             </a>
@@ -108,11 +110,11 @@ export const Header: React.FC<HeaderProps> = React.memo(({
                   href="/"
                   onClick={(e) => {
                     e.preventDefault();
-                    setActiveTab('ocorrencias');
+                    setActiveTab(isApoio ? 'vistoria' : 'ocorrencias');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
                   className="group cursor-pointer text-left"
-                  title="Ir para a Página Inicial (Diário de Bordo)"
+                  title={isApoio ? "Ir para Solicitação de Vistoria" : "Ir para a Página Inicial (Diário de Bordo)"}
                 >
                   <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white group-hover:text-emerald-100 transition-colors">
                     Diário de Bordo - I.S
@@ -122,13 +124,24 @@ export const Header: React.FC<HeaderProps> = React.memo(({
                 {/* Tag de Status de Conexão alinhada ao título */}
                 <button
                   type="button"
-                  onClick={handleOpenGeneralDiagnostic}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border shadow-xs transition-all select-none cursor-pointer ${
+                  onClick={() => {
+                    if (!isApoio) {
+                      handleOpenGeneralDiagnostic();
+                    }
+                  }}
+                  disabled={isApoio}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border shadow-xs transition-all select-none ${
+                    isApoio ? 'cursor-default opacity-90' : 'cursor-pointer hover:scale-105'
+                  } ${
                     healthStatus.isConnected
                       ? 'bg-emerald-900/80 text-emerald-100 border-emerald-500/50 hover:bg-emerald-800'
                       : 'bg-red-950/90 text-red-100 border-red-500/60 hover:bg-red-900 animate-pulse'
                   }`}
-                  title="Clique para visualizar o diagnóstico de conexão, script SQL e sincronizar dados"
+                  title={
+                    isApoio 
+                      ? (healthStatus.isConnected ? 'Banco de Dados Conectado' : 'Banco de Dados Off-line')
+                      : 'Clique para visualizar o diagnóstico de conexão, script SQL e sincronizar dados'
+                  }
                 >
                   <Database className="w-3.5 h-3.5" />
                   <span>
@@ -143,7 +156,7 @@ export const Header: React.FC<HeaderProps> = React.memo(({
               </div>
 
               <p className="text-xs sm:text-sm text-emerald-100/90 font-medium mt-0.5">
-                Gestão Operacional do Departametno Inside Sales
+                Gestão Operacional do Departamento Inside Sales
               </p>
             </div>
           </div>
@@ -176,14 +189,16 @@ export const Header: React.FC<HeaderProps> = React.memo(({
                     style={{
                       background: currentUser.role === 'manager' 
                         ? 'linear-gradient(180deg, rgba(16, 185, 129, 0.35) 0%, rgba(5, 150, 105, 0.25) 100%)'
+                        : currentUser.role === 'apoio'
+                        ? 'linear-gradient(180deg, rgba(2, 132, 199, 0.35) 0%, rgba(3, 105, 161, 0.25) 100%)'
                         : 'linear-gradient(180deg, rgba(20, 184, 166, 0.35) 0%, rgba(13, 148, 136, 0.25) 100%)',
-                      color: currentUser.role === 'manager' ? '#a7f3d0' : '#99f6e4',
+                      color: currentUser.role === 'manager' ? '#a7f3d0' : currentUser.role === 'apoio' ? '#7dd3fc' : '#99f6e4',
                       borderTop: '1px solid rgba(255, 255, 255, 0.3)',
                       borderBottom: '1px solid rgba(0, 0, 0, 0.2)',
                       boxShadow: 'inset 0 0.5px 0.5px rgba(255, 255, 255, 0.4)'
                     }}
                   >
-                    {currentUser.role === 'manager' ? 'Gerente' : 'Supervisora'}
+                    {currentUser.role === 'manager' ? 'Gerente' : currentUser.role === 'apoio' ? 'Apoio' : 'Supervisora'}
                   </span>
                 </div>
 
@@ -208,130 +223,174 @@ export const Header: React.FC<HeaderProps> = React.memo(({
               </div>
             )}
 
-            <div className="flex items-center gap-2">
-              <div className="bg-emerald-950/40 px-3 py-1.5 rounded-lg border border-emerald-700/40 flex items-center gap-2">
-                <span className="text-xs text-emerald-200">Total:</span>
-                <span className="text-sm font-bold text-white">{totalOcorrencias}</span>
-              </div>
-
-              {totalCriticos > 0 && (
-                <div className="bg-red-500/20 px-3 py-1.5 rounded-lg border border-red-400/40 flex items-center gap-2 animate-pulse">
-                  <span className="text-xs text-red-200 font-semibold">Críticos:</span>
-                  <span className="text-sm font-bold text-red-200">{totalCriticos}</span>
+            {!isApoio && (
+              <div className="flex items-center gap-2">
+                <div className="bg-emerald-950/40 px-3 py-1.5 rounded-lg border border-emerald-700/40 flex items-center gap-2">
+                  <span className="text-xs text-emerald-200">Total:</span>
+                  <span className="text-sm font-bold text-white">{totalOcorrencias}</span>
                 </div>
-              )}
 
-              {/* Botão de Exportar CSV */}
-              <button
-                id="btn-global-export-csv"
-                onClick={onExportCSV}
-                title={
-                  activeTab === 'vistoria'
-                    ? 'Exportar Solicitações de Vistoria para Excel/CSV'
-                    : activeTab === 'descontos'
-                    ? 'Exportar Solicitações de Desconto para Excel/CSV'
-                    : activeTab === 'passagem'
-                    ? 'Exportar Fechamentos de Turno e Pendências para Excel/CSV'
-                    : 'Exportar Histórico de Ocorrências para Excel/CSV'
-                }
-                className="p-2 sm:px-3 sm:py-1.5 bg-emerald-800 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 border border-emerald-600/60 shadow-xs cursor-pointer active:scale-95"
-              >
-                <Download className="w-3.5 h-3.5 text-emerald-200" />
-                <span className="hidden sm:inline">
-                  {activeTab === 'vistoria'
-                    ? 'Exportar Vistorias'
-                    : activeTab === 'descontos'
-                    ? 'Exportar Descontos'
-                    : activeTab === 'passagem'
-                    ? 'Exportar Fechamento'
-                    : 'Exportar CSV'}
-                </span>
-              </button>
-            </div>
+                {totalCriticos > 0 && (
+                  <div className="bg-red-500/20 px-3 py-1.5 rounded-lg border border-red-400/40 flex items-center gap-2 animate-pulse">
+                    <span className="text-xs text-red-200 font-semibold">Críticos:</span>
+                    <span className="text-sm font-bold text-red-200">{totalCriticos}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Botão de Exportar CSV */}
+            <button
+              id="btn-global-export-csv"
+              onClick={onExportCSV}
+              title={
+                activeTab === 'vistoria'
+                  ? 'Exportar Solicitações de Vistoria para Excel/CSV'
+                  : activeTab === 'descontos'
+                  ? 'Exportar Solicitações de Desconto para Excel/CSV'
+                  : activeTab === 'passagem'
+                  ? 'Exportar Fechamentos de Turno e Pendências para Excel/CSV'
+                  : activeTab === 'dashboard'
+                  ? 'Exportar Indicadores de BI para Excel/CSV'
+                  : 'Exportar Histórico de Ocorrências para Excel/CSV'
+              }
+              className="p-2 sm:px-3 sm:py-1.5 bg-emerald-800 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 border border-emerald-600/60 shadow-xs cursor-pointer active:scale-95"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-200" />
+              <span className="hidden sm:inline">
+                {activeTab === 'vistoria'
+                  ? 'Exportar Vistorias'
+                  : activeTab === 'descontos'
+                  ? 'Exportar Descontos'
+                  : activeTab === 'passagem'
+                  ? 'Exportar Fechamento'
+                  : activeTab === 'dashboard'
+                  ? 'Exportar BI'
+                  : 'Exportar CSV'}
+              </span>
+            </button>
           </div>
         </div>
 
         {/* Navigation Tabs - Estilo App com suporte a touch e rolagem suave com bisel */}
         <nav className="flex overflow-x-auto space-x-2 mt-4 pt-2 border-t border-emerald-700/60 no-scrollbar touch-pan-x py-1">
-          <button
-            onClick={() => setActiveTab('ocorrencias')}
-            className={`flex items-center space-x-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 select-none ${
-              activeTab === 'ocorrencias'
-                ? 'bg-white text-[#005b2e] font-bold ring-1 ring-white/60'
-                : 'text-emerald-100 bg-white/5 hover:bg-emerald-800/60 hover:text-white'
-            }`}
-            style={activeTab === 'ocorrencias' ? {
-              boxShadow: 'inset 0 1.5px 1px rgba(255, 255, 255, 0.9), 0 3px 8px rgba(0, 0, 0, 0.18)',
-              borderTop: '1px solid #ffffff'
-            } : undefined}
-          >
-            <ClipboardList className="w-4 h-4" />
-            <span>Ocorrências & Registro</span>
-          </button>
+          {isApoio ? (
+            <>
+              <button
+                onClick={() => setActiveTab('vistoria')}
+                className={`flex items-center space-x-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 select-none ${
+                  activeTab === 'vistoria'
+                    ? 'bg-white text-[#005b2e] font-bold ring-1 ring-white/60'
+                    : 'text-emerald-100 bg-white/5 hover:bg-emerald-800/60 hover:text-white'
+                }`}
+                style={activeTab === 'vistoria' ? {
+                  boxShadow: 'inset 0 1.5px 1px rgba(255, 255, 255, 0.9), 0 3px 8px rgba(0, 0, 0, 0.18)',
+                  borderTop: '1px solid #ffffff'
+                } : undefined}
+              >
+                <Car className="w-4 h-4" />
+                <span>Solicitação de Vistoria</span>
+              </button>
 
-          <button
-            onClick={() => setActiveTab('descontos')}
-            className={`flex items-center space-x-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 select-none ${
-              activeTab === 'descontos'
-                ? 'bg-white text-[#005b2e] font-bold ring-1 ring-white/60'
-                : 'text-emerald-100 bg-white/5 hover:bg-emerald-800/60 hover:text-white'
-            }`}
-            style={activeTab === 'descontos' ? {
-              boxShadow: 'inset 0 1.5px 1px rgba(255, 255, 255, 0.9), 0 3px 8px rgba(0, 0, 0, 0.18)',
-              borderTop: '1px solid #ffffff'
-            } : undefined}
-          >
-            <BadgePercent className="w-4 h-4" />
-            <span>Solicitações de Desconto</span>
-          </button>
+              <button
+                onClick={() => setActiveTab('dashboard')}
+                className={`flex items-center space-x-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 select-none ${
+                  activeTab === 'dashboard'
+                    ? 'bg-white text-[#005b2e] font-bold ring-1 ring-white/60'
+                    : 'text-emerald-100 bg-white/5 hover:bg-emerald-800/60 hover:text-white'
+                }`}
+                style={activeTab === 'dashboard' ? {
+                  boxShadow: 'inset 0 1.5px 1px rgba(255, 255, 255, 0.9), 0 3px 8px rgba(0, 0, 0, 0.18)',
+                  borderTop: '1px solid #ffffff'
+                } : undefined}
+              >
+                <BarChart3 className="w-4 h-4" />
+                <span>Dashboard BI</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => setActiveTab('ocorrencias')}
+                className={`flex items-center space-x-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 select-none ${
+                  activeTab === 'ocorrencias'
+                    ? 'bg-white text-[#005b2e] font-bold ring-1 ring-white/60'
+                    : 'text-emerald-100 bg-white/5 hover:bg-emerald-800/60 hover:text-white'
+                }`}
+                style={activeTab === 'ocorrencias' ? {
+                  boxShadow: 'inset 0 1.5px 1px rgba(255, 255, 255, 0.9), 0 3px 8px rgba(0, 0, 0, 0.18)',
+                  borderTop: '1px solid #ffffff'
+                } : undefined}
+              >
+                <ClipboardList className="w-4 h-4" />
+                <span>Ocorrências & Registro</span>
+              </button>
 
-          <button
-            onClick={() => setActiveTab('vistoria')}
-            className={`flex items-center space-x-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 select-none ${
-              activeTab === 'vistoria'
-                ? 'bg-white text-[#005b2e] font-bold ring-1 ring-white/60'
-                : 'text-emerald-100 bg-white/5 hover:bg-emerald-800/60 hover:text-white'
-            }`}
-            style={activeTab === 'vistoria' ? {
-              boxShadow: 'inset 0 1.5px 1px rgba(255, 255, 255, 0.9), 0 3px 8px rgba(0, 0, 0, 0.18)',
-              borderTop: '1px solid #ffffff'
-            } : undefined}
-          >
-            <Car className="w-4 h-4" />
-            <span>Solicitação de Vistoria</span>
-          </button>
+              <button
+                onClick={() => setActiveTab('descontos')}
+                className={`flex items-center space-x-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 select-none ${
+                  activeTab === 'descontos'
+                    ? 'bg-white text-[#005b2e] font-bold ring-1 ring-white/60'
+                    : 'text-emerald-100 bg-white/5 hover:bg-emerald-800/60 hover:text-white'
+                }`}
+                style={activeTab === 'descontos' ? {
+                  boxShadow: 'inset 0 1.5px 1px rgba(255, 255, 255, 0.9), 0 3px 8px rgba(0, 0, 0, 0.18)',
+                  borderTop: '1px solid #ffffff'
+                } : undefined}
+              >
+                <BadgePercent className="w-4 h-4" />
+                <span>Solicitações de Desconto</span>
+              </button>
 
-          <button
-            onClick={() => setActiveTab('dashboard')}
-            className={`flex items-center space-x-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 select-none ${
-              activeTab === 'dashboard'
-                ? 'bg-white text-[#005b2e] font-bold ring-1 ring-white/60'
-                : 'text-emerald-100 bg-white/5 hover:bg-emerald-800/60 hover:text-white'
-            }`}
-            style={activeTab === 'dashboard' ? {
-              boxShadow: 'inset 0 1.5px 1px rgba(255, 255, 255, 0.9), 0 3px 8px rgba(0, 0, 0, 0.18)',
-              borderTop: '1px solid #ffffff'
-            } : undefined}
-          >
-            <BarChart3 className="w-4 h-4" />
-            <span>Dashboard BI</span>
-          </button>
+              <button
+                onClick={() => setActiveTab('vistoria')}
+                className={`flex items-center space-x-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 select-none ${
+                  activeTab === 'vistoria'
+                    ? 'bg-white text-[#005b2e] font-bold ring-1 ring-white/60'
+                    : 'text-emerald-100 bg-white/5 hover:bg-emerald-800/60 hover:text-white'
+                }`}
+                style={activeTab === 'vistoria' ? {
+                  boxShadow: 'inset 0 1.5px 1px rgba(255, 255, 255, 0.9), 0 3px 8px rgba(0, 0, 0, 0.18)',
+                  borderTop: '1px solid #ffffff'
+                } : undefined}
+              >
+                <Car className="w-4 h-4" />
+                <span>Solicitação de Vistoria</span>
+              </button>
 
-          <button
-            onClick={() => setActiveTab('passagem')}
-            className={`flex items-center space-x-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 select-none ${
-              activeTab === 'passagem'
-                ? 'bg-white text-[#005b2e] font-bold ring-1 ring-white/60'
-                : 'text-emerald-100 bg-white/5 hover:bg-emerald-800/60 hover:text-white'
-            }`}
-            style={activeTab === 'passagem' ? {
-              boxShadow: 'inset 0 1.5px 1px rgba(255, 255, 255, 0.9), 0 3px 8px rgba(0, 0, 0, 0.18)',
-              borderTop: '1px solid #ffffff'
-            } : undefined}
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>Fechamento de Turno</span>
-          </button>
+              <button
+                onClick={() => setActiveTab('dashboard')}
+                className={`flex items-center space-x-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 select-none ${
+                  activeTab === 'dashboard'
+                    ? 'bg-white text-[#005b2e] font-bold ring-1 ring-white/60'
+                    : 'text-emerald-100 bg-white/5 hover:bg-emerald-800/60 hover:text-white'
+                }`}
+                style={activeTab === 'dashboard' ? {
+                  boxShadow: 'inset 0 1.5px 1px rgba(255, 255, 255, 0.9), 0 3px 8px rgba(0, 0, 0, 0.18)',
+                  borderTop: '1px solid #ffffff'
+                } : undefined}
+              >
+                <BarChart3 className="w-4 h-4" />
+                <span>Dashboard BI</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('passagem')}
+                className={`flex items-center space-x-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 select-none ${
+                  activeTab === 'passagem'
+                    ? 'bg-white text-[#005b2e] font-bold ring-1 ring-white/60'
+                    : 'text-emerald-100 bg-white/5 hover:bg-emerald-800/60 hover:text-white'
+                }`}
+                style={activeTab === 'passagem' ? {
+                  boxShadow: 'inset 0 1.5px 1px rgba(255, 255, 255, 0.9), 0 3px 8px rgba(0, 0, 0, 0.18)',
+                  borderTop: '1px solid #ffffff'
+                } : undefined}
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Fechamento de Turno</span>
+              </button>
+            </>
+          )}
         </nav>
       </div>
 

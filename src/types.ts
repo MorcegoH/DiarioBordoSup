@@ -20,7 +20,7 @@ export type Status = 'Pendente' | 'Em Análise' | 'Resolvido';
  * TIPOS DE AUTENTICAÇÃO, USUÁRIOS E CONTROLE DE ACESSO (RBAC)
  * =====================================================================
  */
-export type UserRole = 'manager' | 'supervisor';
+export type UserRole = 'manager' | 'supervisor' | 'apoio';
 
 export interface AuthUser {
   id: string;
@@ -78,7 +78,7 @@ export interface Ocorrencia {
 export interface ComentarioPassagem {
   id: string;
   autor: string; // Nome do líder/supervisor
-  contexto: 'funcionou' | 'pendente' | 'geral'; // Se o comentário é sobre o que funcionou ou auxílio na pendência
+  contexto: 'funcionou' | 'pendente' | 'solucao' | 'geral'; // Se o comentário é sobre o que funcionou, auxílio na pendência ou solução
   tipo: 'auxilio' | 'reconhecimento' | 'alinhamento'; // Tipo do apontamento
   mensagem: string; // Texto do comentário/auxílio
   dataHora: string; // ISO string do comentário

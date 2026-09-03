@@ -118,8 +118,9 @@ function comparacaoTempoConstante(a: string, b: string): boolean {
 
 /**
  * Credenciais Padrão Iniciais (Salt + Hash SHA-256)
- * - Heder (Gerente): heder.santos / 11M1kh43l@23 (também aceita variações com 1/l/L)
+ * - Heder (Gerente): heder.santos / 11M1kh43l@23
  * - Débora (Supervisora): debora.rodrigues / Sup1ns1d3@2026
+ * - Erick (Apoio à Supervisão): erick.thomas / 4d4rc0@3r1ck2026
  */
 const DEFAULT_CREDENTIALS: Record<string, UserCredentialData> = {
   'heder.santos': {
@@ -138,6 +139,15 @@ const DEFAULT_CREDENTIALS: Record<string, UserCredentialData> = {
     cargo: 'Supervisora de Inside Sales',
     salt: 'salt_user_debora_rodrigues_2026',
     hashSha256: 'ac05396f1569d51d52df65f5456402f8bb8506fc9e06214d5bddc68584cfb6aa',
+    updatedAt: new Date().toISOString()
+  },
+  'erick.thomas': {
+    username: 'erick.thomas',
+    name: 'Erick Thomas',
+    role: 'apoio',
+    cargo: 'Apoio à Supervisão',
+    salt: 'salt_user_erick_thomas_2026',
+    hashSha256: '1fc0517bd74cf8c1514fae022764f43b85e20da4db23b64f0b0f7de0f68a7880',
     updatedAt: new Date().toISOString()
   }
 };
@@ -164,6 +174,12 @@ const ACCEPTED_DEFAULT_PASSWORDS: Record<string, string[]> = {
     'supinside@2026',
     'Sup1ns1d3@23',
     'sup1ns1d3@23'
+  ],
+  'erick.thomas': [
+    '4d4rc0@3r1ck2026',
+    '4D4RC0@3R1CK2026',
+    '4d4rc0@3r1ck',
+    '4d4rc0@3r1ck23'
   ]
 };
 
@@ -346,10 +362,10 @@ class AuthService {
           if (row.username && row.hash_sha256) {
             current[row.username] = {
               username: row.username,
-              name: row.name || (row.username === 'heder.santos' ? 'Heder Santos' : 'Débora Rodrigues'),
-              role: (row.role as UserRole) || (row.username === 'heder.santos' ? 'manager' : 'supervisor'),
-              cargo: row.cargo || (row.username === 'heder.santos' ? 'Gerente de Inside Sales' : 'Supervisora de Inside Sales'),
-              salt: row.salt || (row.username === 'heder.santos' ? 'salt_user_heder_santos_2026' : 'salt_user_debora_rodrigues_2026'),
+              name: row.name || (row.username === 'heder.santos' ? 'Heder Santos' : row.username === 'erick.thomas' ? 'Erick Thomas' : 'Débora Rodrigues'),
+              role: (row.role as UserRole) || (row.username === 'heder.santos' ? 'manager' : row.username === 'erick.thomas' ? 'apoio' : 'supervisor'),
+              cargo: row.cargo || (row.username === 'heder.santos' ? 'Gerente de Inside Sales' : row.username === 'erick.thomas' ? 'Apoio à Supervisão' : 'Supervisora de Inside Sales'),
+              salt: row.salt || (row.username === 'heder.santos' ? 'salt_user_heder_santos_2026' : row.username === 'erick.thomas' ? 'salt_user_erick_thomas_2026' : 'salt_user_debora_rodrigues_2026'),
               hashSha256: row.hash_sha256,
               updatedAt: row.updated_at || new Date().toISOString()
             };
@@ -411,8 +427,16 @@ class AuthService {
       name: userCred.name,
       role: userCred.role,
       cargo: userCred.cargo,
-      email: cleanUsername === 'heder.santos' ? 'heder.lsantos@gmail.com' : 'debora.rodrigues@adarco.com.br',
-      avatarColor: userCred.role === 'manager' ? '#005b2e' : '#059669',
+      email: cleanUsername === 'heder.santos' 
+        ? 'heder.lsantos@gmail.com' 
+        : cleanUsername === 'erick.thomas'
+        ? 'erick.thomas@adarco.com.br'
+        : 'debora.rodrigues@adarco.com.br',
+      avatarColor: userCred.role === 'manager' 
+        ? '#005b2e' 
+        : userCred.role === 'apoio'
+        ? '#0284c7'
+        : '#059669',
       ultimoAcesso: new Date().toISOString()
     };
 
@@ -472,6 +496,13 @@ class AuthService {
    */
   public isSupervisor(): boolean {
     return this.activeUser?.role === 'supervisor';
+  }
+
+  /**
+   * Verifica se o usuário atual tem perfil de Apoio à Supervisão
+   */
+  public isApoio(): boolean {
+    return this.activeUser?.role === 'apoio';
   }
 
   /**
@@ -546,7 +577,7 @@ CREATE TABLE IF NOT EXISTS public.app_users_auth (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     username TEXT UNIQUE NOT NULL,
     name TEXT NOT NULL,
-    role TEXT NOT NULL DEFAULT 'supervisor', -- 'manager' | 'supervisor'
+    role TEXT NOT NULL DEFAULT 'supervisor', -- 'manager' | 'supervisor' | 'apoio'
     cargo TEXT NOT NULL,
     salt TEXT NOT NULL,
     hash_sha256 TEXT NOT NULL,
@@ -566,11 +597,12 @@ DROP POLICY IF EXISTS "Permitir atualizacao de credenciais" ON public.app_users_
 CREATE POLICY "Permitir atualizacao de credenciais"
 ON public.app_users_auth FOR ALL USING (true);
 
--- Inserção inicial padrão (Heder Santos e Débora Rodrigues com Hashes SHA-256)
+-- Inserção inicial padrão (Heder Santos, Débora Rodrigues e Erick Thomas com Hashes SHA-256)
 INSERT INTO public.app_users_auth (username, name, role, cargo, salt, hash_sha256)
 VALUES 
   ('heder.santos', 'Heder Santos', 'manager', 'Gerente de Inside Sales', 'salt_user_heder_santos_2026', 'e5f1f67dff0a73343d98aa76a4b528964dd95c3e11e6d39a6c79824b11c551aa'),
-  ('debora.rodrigues', 'Débora Rodrigues', 'supervisor', 'Supervisora de Inside Sales', 'salt_user_debora_rodrigues_2026', 'ac05396f1569d51d52df65f5456402f8bb8506fc9e06214d5bddc68584cfb6aa')
+  ('debora.rodrigues', 'Débora Rodrigues', 'supervisor', 'Supervisora de Inside Sales', 'salt_user_debora_rodrigues_2026', 'ac05396f1569d51d52df65f5456402f8bb8506fc9e06214d5bddc68584cfb6aa'),
+  ('erick.thomas', 'Erick Thomas', 'apoio', 'Apoio à Supervisão', 'salt_user_erick_thomas_2026', '1fc0517bd74cf8c1514fae022764f43b85e20da4db23b64f0b0f7de0f68a7880')
 ON CONFLICT (username) DO NOTHING;
 `;
   }

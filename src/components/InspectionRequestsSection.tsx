@@ -111,7 +111,7 @@ export const InspectionRequestsSection: React.FC<InspectionRequestsSectionProps>
       {/* 1. FORMULÁRIO DE CADASTRO DE VISTORIA */}
       <InspectionRequestForm
         onAddVistoria={handleAddVistoria}
-        currentUser={currentUser ? { name: currentUser.nome, role: currentUser.cargo } : undefined}
+        currentUser={currentUser ? { name: currentUser.name, role: currentUser.role } : undefined}
       />
 
       {/* 3. TABELA DE SOLICITAÇÕES COM FILTROS E MÉTRICAS */}
@@ -130,7 +130,7 @@ export const InspectionRequestsSection: React.FC<InspectionRequestsSectionProps>
         vistoria={selectedForApproval}
         onClose={() => setSelectedForApproval(null)}
         onConfirmAprovacao={handleConfirmAprovacao}
-        defaultAprovador={currentUser?.nome || 'Vistoriador'}
+        defaultAprovador={currentUser?.name || 'Vistoriador'}
       />
 
       {/* Modal de Reprovação */}
@@ -138,7 +138,7 @@ export const InspectionRequestsSection: React.FC<InspectionRequestsSectionProps>
         vistoria={selectedForRejection}
         onClose={() => setSelectedForRejection(null)}
         onConfirmReprovacao={handleConfirmReprovacao}
-        defaultAprovador={currentUser?.nome || 'Vistoriador'}
+        defaultAprovador={currentUser?.name || 'Vistoriador'}
       />
 
       {/* Modal de Detalhes Completos */}
