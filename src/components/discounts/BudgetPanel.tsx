@@ -58,209 +58,157 @@ export const BudgetPanel: React.FC<BudgetPanelProps> = React.memo(({
   return (
     <div className="corporate-card p-5 sm:p-6 mb-8 relative border-l-4 border-l-[#005b2e] bg-white shadow-xs">
       
-      {/* 1. Barra Informativa de Período e Renovação Mensal */}
-      <div className="mb-4 p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
-        <div className="flex items-center flex-wrap gap-2.5 text-emerald-950">
-          <span className="inline-flex items-center gap-1.5 font-bold px-2.5 py-1 bg-[#005b2e] text-white rounded-lg shadow-xs">
-            <CalendarDays className="w-3.5 h-3.5" />
-            {ciclo.mesExtenso}
-          </span>
+      {/* Cabeçalho Consolidado e Limpo */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 mb-5 border-b border-gray-100">
+        <div>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <div className="p-1.5 bg-emerald-50 rounded-lg text-primary-green">
+              <Wallet className="w-5 h-5" />
+            </div>
+            <h2 className="text-base font-bold text-gray-900">
+              Orçamento Mensal de Descontos
+            </h2>
+            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200">
+              Teto Global: R$ {budget.tetoTotalDepartamento.toFixed(2).replace('.', ',')}
+            </span>
+            <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-gray-100 text-gray-700 border border-gray-200">
+              {ciclo.mesExtenso}
+            </span>
+          </div>
         </div>
 
-        {/* Seletor de Mês e Alerta de Renovação */}
-        <div className="flex items-center gap-3">
-          {mesesDisponiveis && mesesDisponiveis.length > 0 && onChangeMes && (
-            <div className="flex items-center gap-1.5">
-              <label className="text-gray-600 font-semibold text-[11px] whitespace-nowrap">
-                Filtrar Ciclo:
-              </label>
-              <select
-                value={mesSelecionado || ciclo.mesAno}
-                onChange={(e) => onChangeMes(e.target.value)}
-                className="bg-white border border-emerald-300 rounded-lg px-2 py-1 text-xs font-semibold text-emerald-900 focus:ring-2 focus:ring-[#005b2e] cursor-pointer"
-              >
-                {mesesDisponiveis.map((m) => (
-                  <option key={m.mesAno} value={m.mesAno}>
-                    {m.label} {m.mesAno === budget.ciclo.mesAno && budget.ciclo.isMesAtual ? '(Atual)' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
+        {/* Resumo do Saldo & Seletor de Ciclo */}
+        <div className="flex items-center gap-3 flex-wrap">
+          {mesesDisponiveis && mesesDisponiveis.length > 1 && onChangeMes && (
+            <select
+              value={mesSelecionado || ciclo.mesAno}
+              onChange={(e) => onChangeMes(e.target.value)}
+              className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-gray-700 focus:border-[#005b2e] focus:ring-1 focus:ring-[#005b2e] cursor-pointer"
+            >
+              {mesesDisponiveis.map((m) => (
+                <option key={m.mesAno} value={m.mesAno}>
+                  {m.label} {m.mesAno === budget.ciclo.mesAno && budget.ciclo.isMesAtual ? '(Atual)' : ''}
+                </option>
+              ))}
+            </select>
           )}
 
-          <div className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-emerald-200 rounded-lg text-[11px] font-semibold text-emerald-900 shadow-2xs">
-            <RotateCw className="w-3 h-3 text-[#005b2e] shrink-0" />
-            <span>
-              Liberação em: <strong>{ciclo.dataProximaRenovacao}</strong>
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Cabeçalho do Painel */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-5 border-b border-gray-200">
-        <div className="flex items-center space-x-2">
-          <div className="p-2 bg-emerald-50 rounded-lg text-primary-green">
-            <Wallet className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-lg font-bold text-gray-800">
-                Painel de Orçamento Mensal de Descontos
-              </h2>
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-300">
-                Teto Mensal: R$ {budget.tetoTotalDepartamento.toFixed(2).replace('.', ',')}
+          <div className="flex items-center gap-3 bg-gray-50 px-3.5 py-1.5 rounded-lg border border-gray-200 text-xs">
+            <div>
+              <span className="text-gray-500 block text-[10px] uppercase font-semibold">Saldo Global</span>
+              <span className={`font-bold text-sm ${saldoTotalDepartamento > 100 ? 'text-[#005b2e]' : 'text-amber-700'}`}>
+                R$ {saldoTotalDepartamento.toFixed(2).replace('.', ',')}
               </span>
-              {ciclo.isMesAtual ? (
-                <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md">
-                  ● Ciclo Vigente
-                </span>
-              ) : (
-                <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-100 text-amber-800 rounded-md">
-                  Histórico do Ciclo
-                </span>
-              )}
             </div>
-            <p className="text-xs text-gray-500 font-medium mt-0.5">
-              Valores estritamente mensais (renovados todo dia 01) com apuração em tempo real por supervisão.
-            </p>
-          </div>
-        </div>
-
-        {/* Resumo do Saldo Global */}
-        <div className="flex items-center gap-4 bg-gray-50 px-4 py-2 rounded-lg border border-gray-200">
-          <div>
-            <span className="text-[11px] uppercase tracking-wider text-gray-500 font-bold block">
-              Saldo Restante do Mês
-            </span>
-            <span className={`text-lg font-bold ${saldoTotalDepartamento > 200 ? 'text-[#005b2e]' : 'text-amber-700'}`}>
-              R$ {saldoTotalDepartamento.toFixed(2).replace('.', ',')}
-            </span>
-          </div>
-          <div className="h-8 w-px bg-gray-200"></div>
-          <div>
-            <span className="text-[11px] uppercase tracking-wider text-gray-500 font-bold block">
-              Concedido no Mês
-            </span>
-            <span className="text-sm font-bold text-gray-700">
-              R$ {totalGastoDepartamento.toFixed(2).replace('.', ',')} ({percentualTotalGasto.toFixed(0)}%)
-            </span>
+            <div className="h-6 w-px bg-gray-200"></div>
+            <div>
+              <span className="text-gray-500 block text-[10px] uppercase font-semibold">Utilizado</span>
+              <span className="font-bold text-sm text-gray-800">
+                R$ {totalGastoDepartamento.toFixed(2).replace('.', ',')} ({percentualTotalGasto.toFixed(0)}%)
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Grid de Cards de Orçamento: Débora Rodrigues (Supervisão Unificada) e Reserva Gerente */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      {/* Grid de Cards: Débora Rodrigues (Supervisão Unificada) e Reserva do Gerente */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         
-        {/* Card Supervisora Débora Rodrigues (Supervisão Unificada) */}
-        <div className={`p-4 sm:p-5 rounded-xl border transition-all ${
+        {/* Card 1: Supervisão Unificada (Débora Rodrigues) */}
+        <div className={`p-4 rounded-xl border transition-colors ${
           budget.debora.saldoDisponivel <= 0
-            ? 'bg-red-50/70 border-red-300'
+            ? 'bg-red-50/50 border-red-200'
             : budget.debora.saldoDisponivel < 100
-            ? 'bg-amber-50/60 border-amber-300'
-            : 'bg-white border-gray-200 hover:border-emerald-300 shadow-2xs'
+            ? 'bg-amber-50/40 border-amber-200'
+            : 'bg-white border-gray-200 hover:border-emerald-300'
         }`}>
-          <div className="flex items-start justify-between mb-2">
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-full bg-emerald-100 text-[#005b2e] font-extrabold flex items-center justify-center text-sm shadow-2xs">
-                DR
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-gray-800">Débora Rodrigues</h3>
-                <span className="text-xs text-emerald-800 font-semibold">Supervisora Geral — Inside Sales</span>
-              </div>
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h3 className="text-sm font-bold text-gray-900">Débora Rodrigues</h3>
+              <p className="text-xs text-gray-500">Supervisão — Inside Sales</p>
             </div>
             {budget.debora.saldoDisponivel <= 0 ? (
-              <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 bg-red-100 text-red-800 rounded-md border border-red-300">
-                <AlertTriangle className="w-3.5 h-3.5" /> Teto Esgotado
+              <span className="text-[11px] font-bold px-2 py-0.5 bg-red-100 text-red-800 rounded border border-red-200">
+                Esgotado
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 bg-emerald-50 text-[#005b2e] rounded-md border border-emerald-300">
-                <CheckCircle className="w-3.5 h-3.5" /> Ativo ({ciclo.mesCurto})
+              <span className="text-[11px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-800 rounded border border-emerald-200">
+                Ativo
               </span>
             )}
           </div>
 
-          <div className="space-y-2 my-4">
+          <div className="space-y-2">
             <div className="flex justify-between items-baseline text-xs">
-              <span className="text-gray-600 font-semibold">Saldo Mensal Disponível:</span>
-              <span className={`font-extrabold text-lg ${budget.debora.saldoDisponivel <= 0 ? 'text-red-700' : 'text-[#005b2e]'}`}>
+              <span className="text-gray-600 font-medium">Saldo Disponível:</span>
+              <span className={`font-extrabold text-base ${budget.debora.saldoDisponivel <= 0 ? 'text-red-700' : 'text-[#005b2e]'}`}>
                 R$ {budget.debora.saldoDisponivel.toFixed(2).replace('.', ',')}
               </span>
             </div>
             
             {/* Barra de Progresso */}
-            <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+            <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
               <div
-                className={`h-2.5 rounded-full transition-all duration-500 ${
-                  deboraPerc >= 100 ? 'bg-red-600' : deboraPerc > 75 ? 'bg-amber-500' : 'bg-primary-green'
+                className={`h-2 rounded-full transition-all duration-500 ${
+                  deboraPerc >= 100 ? 'bg-red-600' : deboraPerc > 75 ? 'bg-amber-500' : 'bg-[#005b2e]'
                 }`}
                 style={{ width: `${deboraPerc}%` }}
               ></div>
             </div>
 
-            <div className="flex justify-between text-xs text-gray-500 pt-1">
+            <div className="flex justify-between text-xs text-gray-500 pt-0.5">
               <span>Utilizado: <strong>R$ {budget.debora.totalUtilizado.toFixed(2).replace('.', ',')}</strong> ({deboraPerc.toFixed(0)}%)</span>
-              <span>Teto da Supervisão: <strong>R$ {budget.debora.tetoMensal.toFixed(2).replace('.', ',')}/mês</strong></span>
+              <span>Teto: <strong>R$ {budget.debora.tetoMensal.toFixed(2).replace('.', ',')}</strong></span>
             </div>
           </div>
 
           {budget.debora.totalPendente > 0 && (
-            <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between text-xs text-amber-700 font-medium">
+            <div className="mt-3 pt-2 border-t border-gray-100 flex items-center justify-between text-xs text-amber-800 font-medium">
               <span className="flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5" /> Solicitações em análise:
+                <Clock className="w-3.5 h-3.5 text-amber-600" /> Em análise:
               </span>
               <span className="font-bold">R$ {budget.debora.totalPendente.toFixed(2).replace('.', ',')}</span>
             </div>
           )}
         </div>
 
-        {/* Card Reserva Exclusiva do Gerente Heder Santos */}
-        <div className={`p-4 sm:p-5 rounded-xl border relative overflow-hidden transition-all ${
+        {/* Card 2: Reserva Exclusiva do Gerente (Heder Santos) */}
+        <div className={`p-4 rounded-xl border transition-colors ${
           budget.reservaGerente <= 0 
-            ? 'border-red-300 bg-red-50/40' 
-            : 'border-gray-200 bg-gray-50 shadow-2xs'
+            ? 'border-red-200 bg-red-50/40' 
+            : 'border-gray-200 bg-white hover:border-emerald-300'
         }`}>
-          <div className="flex items-start justify-between mb-2">
-            <div className="flex items-center gap-2.5">
-              <div className={`w-10 h-10 rounded-full font-extrabold flex items-center justify-center text-sm shadow-2xs ${
-                budget.reservaGerente <= 0 
-                  ? 'bg-red-100 text-red-700' 
-                  : 'bg-emerald-100 text-[#005b2e]'
-              }`}>
-                <Shield className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-gray-800">Heder Santos</h3>
-                <span className="text-xs text-emerald-800 font-semibold">Gerente de Vendas (Aprovador)</span>
-              </div>
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h3 className="text-sm font-bold text-gray-900">Heder Santos</h3>
+              <p className="text-xs text-gray-500">Gerência de Vendas (Reserva)</p>
             </div>
             {budget.reservaGerente <= 0 ? (
-              <span className="inline-flex items-center text-xs font-bold px-2.5 py-1 bg-red-100 text-red-800 rounded-md border border-red-300">
-                Teto Esgotado ({ciclo.mesCurto})
+              <span className="text-[11px] font-bold px-2 py-0.5 bg-red-100 text-red-800 rounded border border-red-200">
+                Esgotado
               </span>
             ) : (
-              <span className="inline-flex items-center text-xs font-bold px-2.5 py-1 bg-emerald-50 text-emerald-800 rounded-md border border-emerald-300">
-                Reserva de Contingência
+              <span className="text-[11px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-800 rounded border border-emerald-200">
+                Contingência
               </span>
             )}
           </div>
 
-          <div className="space-y-2 my-4">
+          <div className="space-y-2">
             <div className="flex justify-between items-baseline text-xs">
-              <span className="text-gray-600 font-semibold">Saldo Restante ({ciclo.mesCurto}):</span>
-              <span className={`font-extrabold text-lg ${budget.reservaGerente <= 0 ? 'text-red-700' : 'text-[#005b2e]'}`}>
+              <span className="text-gray-600 font-medium">Saldo Disponível:</span>
+              <span className={`font-extrabold text-base ${budget.reservaGerente <= 0 ? 'text-red-700' : 'text-[#005b2e]'}`}>
                 R$ {budget.reservaGerente.toFixed(2).replace('.', ',')}
               </span>
             </div>
             
-            {/* Barra de progresso */}
-            <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+            {/* Barra de Progresso */}
+            <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
               <div 
-                className={`h-2.5 rounded-full transition-all duration-500 ${
+                className={`h-2 rounded-full transition-all duration-500 ${
                   budget.reservaGerente <= 0 
                     ? 'bg-red-600 w-full' 
-                    : 'bg-primary-green'
+                    : 'bg-[#005b2e]'
                 }`}
                 style={{ 
                   width: `${budget.gerente ? Math.min(100, (budget.gerente.totalUtilizado / budget.gerente.tetoMensal) * 100) : 0}%` 
@@ -268,34 +216,19 @@ export const BudgetPanel: React.FC<BudgetPanelProps> = React.memo(({
               ></div>
             </div>
 
-            <div className="flex justify-between text-xs text-gray-500 pt-1">
+            <div className="flex justify-between text-xs text-gray-500 pt-0.5">
               <span>Utilizado: <strong>R$ {(budget.gerente?.totalUtilizado || 0).toFixed(2).replace('.', ',')}</strong></span>
-              <span>Teto Gerencial: <strong>R$ {(budget.gerente?.tetoMensal || 200).toFixed(2).replace('.', ',')}/mês</strong></span>
+              <span>Teto: <strong>R$ {(budget.gerente?.tetoMensal || 200).toFixed(2).replace('.', ',')}</strong></span>
             </div>
-
-            {budget.reservaGerente <= 0 ? (
-              <div className="p-2.5 bg-red-100/70 border border-red-300 rounded text-xs text-red-900 mt-2 flex items-start gap-1.5 font-medium">
-                <AlertOctagon className="w-3.5 h-3.5 text-red-600 shrink-0 mt-0.5" />
-                <span>O teto mensal do Gerente (R$ 200,00) em {ciclo.mesCurto} foi atingido. Próxima liberação em {ciclo.dataProximaRenovacao}.</span>
-              </div>
-            ) : (
-              <p className="text-xs text-gray-500 pt-1 leading-snug">
-                Reserva estratégica mensal para exceções comerciais autorizadas diretamente pela gerência.
-              </p>
-            )}
 
             {onOpenManagerRelease && (
               <button
                 type="button"
                 onClick={onOpenManagerRelease}
-                className={`mt-3 w-full py-1.5 px-3 rounded-lg text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer ${
-                  budget.reservaGerente <= 0
-                    ? 'bg-gray-200 text-gray-700 hover:bg-gray-300 border border-gray-300'
-                    : 'bg-[#005b2e] hover:bg-emerald-800 text-white'
-                }`}
+                className="mt-3 w-full py-1.5 px-3 rounded-lg text-xs font-bold transition-colors bg-[#005b2e] hover:bg-emerald-800 text-white flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <Shield className="w-3.5 h-3.5 text-emerald-200" />
-                <span>{budget.reservaGerente <= 0 ? 'Consultar / Registrar Liberação' : 'Registrar Desconto do Gerente'}</span>
+                <Shield className="w-3.5 h-3.5" />
+                <span>Registrar Desconto da Gerência</span>
               </button>
             )}
           </div>

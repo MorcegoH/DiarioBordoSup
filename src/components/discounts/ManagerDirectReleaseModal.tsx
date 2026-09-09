@@ -50,6 +50,7 @@ export const ManagerDirectReleaseModal: React.FC<ManagerDirectReleaseModalProps>
   const [tipoDesconto, setTipoDesconto] = useState<TipoDesconto>('Adesão');
   
   // Valores financeiros
+  const [valorCheioAdesao, setValorCheioAdesao] = useState<string>('200.00');
   const [descontoValorAdesao, setDescontoValorAdesao] = useState<string>('');
   const [valorCheioPlano, setValorCheioPlano] = useState<string>('150.00');
   const [descontoPercentualPlano, setDescontoPercentualPlano] = useState<string>('');
@@ -82,7 +83,7 @@ export const ManagerDirectReleaseModal: React.FC<ManagerDirectReleaseModalProps>
   // Cálculos financeiros em tempo real
   const calculos = useMemo(() => {
     const res = tipoDesconto === 'Adesão'
-      ? calcularDescontoAdesao(descontoValorAdesao)
+      ? calcularDescontoAdesao(descontoValorAdesao, valorCheioAdesao)
       : calcularDescontoPlano(valorCheioPlano, descontoPercentualPlano);
 
     // Validação da Reserva do Gerente
@@ -99,7 +100,7 @@ export const ManagerDirectReleaseModal: React.FC<ManagerDirectReleaseModalProps>
       tetoGerenteEsgotado,
       excedeSaldoGerente
     };
-  }, [tipoDesconto, descontoValorAdesao, valorCheioPlano, descontoPercentualPlano, saldoReservaGerente]);
+  }, [tipoDesconto, descontoValorAdesao, valorCheioAdesao, valorCheioPlano, descontoPercentualPlano, saldoReservaGerente]);
 
   if (!isOpen) return null;
 
@@ -192,6 +193,7 @@ export const ManagerDirectReleaseModal: React.FC<ManagerDirectReleaseModalProps>
     // Limpar campos
     setCliente('');
     setPlacaInput('');
+    setValorCheioAdesao('200.00');
     setDescontoValorAdesao('');
     setDescontoPercentualPlano('');
     setMotivoLiberacao('');
@@ -386,8 +388,9 @@ export const ManagerDirectReleaseModal: React.FC<ManagerDirectReleaseModalProps>
               Tipo de Desconto Concedido *
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {/* Opção Adesão */}
               <label
-                className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${
+                className={`flex items-start p-3 rounded-lg border cursor-pointer transition-all ${
                   tipoDesconto === 'Adesão'
                     ? 'border-[#005b2e] bg-emerald-50/60 ring-1 ring-[#005b2e]'
                     : 'border-gray-200 bg-white hover:border-gray-300'
@@ -398,16 +401,20 @@ export const ManagerDirectReleaseModal: React.FC<ManagerDirectReleaseModalProps>
                   name="mgr_tipoDesconto"
                   checked={tipoDesconto === 'Adesão'}
                   onChange={() => setTipoDesconto('Adesão')}
-                  className="w-4 h-4 text-[#005b2e] focus:ring-[#005b2e]"
+                  className="w-4 h-4 mt-0.5 text-[#005b2e] focus:ring-[#005b2e] cursor-pointer"
                 />
                 <div className="ml-2.5">
-                  <span className="text-xs font-bold text-gray-800 block">Desconto em Adesão</span>
-                  <span className="text-[11px] text-gray-500 block">Valor Cheio: R$ 200,00 (Até R$ 200,00)</span>
+                  <span className="text-xs font-bold text-gray-800 flex items-center gap-1">
+                    <span className="text-[#005b2e] font-extrabold text-sm leading-none">$</span>
+                    <span>Desconto em Adesão</span>
+                  </span>
+                  <span className="text-[11px] text-gray-500 block mt-0.5">Desconto Total Liberado</span>
                 </div>
               </label>
 
+              {/* Opção Plano */}
               <label
-                className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${
+                className={`flex items-start p-3 rounded-lg border cursor-pointer transition-all ${
                   tipoDesconto === 'Plano'
                     ? 'border-[#005b2e] bg-emerald-50/60 ring-1 ring-[#005b2e]'
                     : 'border-gray-200 bg-white hover:border-gray-300'
@@ -418,11 +425,14 @@ export const ManagerDirectReleaseModal: React.FC<ManagerDirectReleaseModalProps>
                   name="mgr_tipoDesconto"
                   checked={tipoDesconto === 'Plano'}
                   onChange={() => setTipoDesconto('Plano')}
-                  className="w-4 h-4 text-[#005b2e] focus:ring-[#005b2e]"
+                  className="w-4 h-4 mt-0.5 text-[#005b2e] focus:ring-[#005b2e] cursor-pointer"
                 />
                 <div className="ml-2.5">
-                  <span className="text-xs font-bold text-gray-800 block">Desconto em Plano Mensal</span>
-                  <span className="text-[11px] text-gray-500 block">Desconto em % (Teto: 20,0%)</span>
+                  <span className="text-xs font-bold text-gray-800 flex items-center gap-1">
+                    <span className="text-[#005b2e] font-extrabold text-sm leading-none">%</span>
+                    <span>Desconto em Plano Mensal</span>
+                  </span>
+                  <span className="text-[11px] text-gray-500 block mt-0.5">Desconto em % (Teto máximo: 20,0%)</span>
                 </div>
               </label>
             </div>
@@ -433,31 +443,60 @@ export const ManagerDirectReleaseModal: React.FC<ManagerDirectReleaseModalProps>
             {tipoDesconto === 'Adesão' ? (
               <>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
                     Valor Cheio da Adesão
                   </label>
-                  <input
-                    type="text"
-                    disabled
-                    value="R$ 200,00"
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-gray-200 bg-gray-100 font-bold text-gray-700"
-                  />
+                  
+                  {/* Seletor Rápido de Opções de Adesão */}
+                  <div className="grid grid-cols-3 gap-1.5 mb-1.5">
+                    {[
+                      { valor: '200.00', label: 'R$ 200' },
+                      { valor: '160.00', label: 'R$ 160' },
+                      { valor: '100.00', label: 'R$ 100' }
+                    ].map((opcao) => {
+                      const isSelected = Math.abs(parseFloat(valorCheioAdesao || '0') - parseFloat(opcao.valor)) < 0.01;
+                      return (
+                        <button
+                          key={opcao.valor}
+                          type="button"
+                          onClick={() => {
+                            setValorCheioAdesao(opcao.valor);
+                            if (parseFloat(descontoValorAdesao) > parseFloat(opcao.valor)) {
+                              setDescontoValorAdesao(opcao.valor);
+                            }
+                          }}
+                          className={`py-1.5 px-1 text-xs font-bold rounded-lg border transition-all cursor-pointer text-center ${
+                            isSelected
+                              ? 'bg-[#005b2e] text-white border-[#004724] shadow-xs'
+                              : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                          }`}
+                        >
+                          {opcao.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
                     Valor do Desconto Liberado (R$) *
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="200"
-                    required
-                    value={descontoValorAdesao}
-                    onChange={(e) => setDescontoValorAdesao(e.target.value)}
-                    placeholder="Ex: 50.00 ou até 200.00"
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 font-bold text-gray-800 focus:ring-2 focus:ring-[#005b2e]"
-                  />
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-gray-500 text-xs font-bold">
+                      R$
+                    </div>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max={calculos.valorCheio || 200}
+                      required
+                      value={descontoValorAdesao}
+                      onChange={(e) => setDescontoValorAdesao(e.target.value)}
+                      placeholder="Ex: 30.00"
+                      className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-gray-200 font-bold text-gray-800 focus:ring-1 focus:ring-[#005b2e]"
+                    />
+                  </div>
                 </div>
               </>
             ) : (

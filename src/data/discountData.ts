@@ -39,6 +39,12 @@ export const BUDGET_LIMITS = {
 } as const;
 
 /**
+ * Opções padrão de valor cheio de Adesão disponíveis para seleção:
+ * Sempre inicia em R$ 200,00, com opções de R$ 160,00 e R$ 100,00.
+ */
+export const OPCOES_VALOR_ADESAO = [200.0, 160.0, 100.0] as const;
+
+/**
  * Validação de placa de veículo:
  * - Padrão Antigo: ABC-1234 ou ABC1234
  * - Padrão Mercosul: ABC1D23 ou ABC-1D23

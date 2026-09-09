@@ -70,11 +70,17 @@ export interface ResultadoCalculoFinanceiro {
 
 /**
  * Calcula desconto para a modalidade Adesão:
- * - Valor Cheio: R$ 200,00 fixo e inalterável
- * - Desconto informado em R$ (pode ir de R$ 0,00 até R$ 200,00)
+ * - Valor Cheio: Padrão R$ 200,00 (podendo alternar para R$ 160,00, R$ 100,00 ou outro valor válido)
+ * - Desconto informado em R$ (pode ir de R$ 0,00 até o valor cheio da adesão)
  */
-export function calcularDescontoAdesao(descontoInputRaw: string | number): ResultadoCalculoFinanceiro {
-  const valorCheioCents = toCents(BUDGET_LIMITS.valorAdesaoPadrao); // 20000 centavos
+export function calcularDescontoAdesao(
+  descontoInputRaw: string | number,
+  valorCheioRaw?: string | number
+): ResultadoCalculoFinanceiro {
+  const valorCheioNum = valorCheioRaw !== undefined && valorCheioRaw !== null && String(valorCheioRaw).trim() !== ''
+    ? Math.max(0, parseInputNumber(valorCheioRaw))
+    : BUDGET_LIMITS.valorAdesaoPadrao;
+  const valorCheioCents = toCents(valorCheioNum);
   const inputNum = parseInputNumber(descontoInputRaw);
   const inputCents = toCents(inputNum);
 
@@ -83,7 +89,7 @@ export function calcularDescontoAdesao(descontoInputRaw: string | number): Resul
 
   if (inputCents > valorCheioCents) {
     excedeTeto = true;
-    mensagemErroTeto = `O desconto de Adesão não pode ultrapassar o valor total de ${formatarMoedaBRL(BUDGET_LIMITS.valorAdesaoPadrao)}.`;
+    mensagemErroTeto = `O desconto de Adesão não pode ultrapassar o valor cheio de ${formatarMoedaBRL(valorCheioNum)}.`;
   } else if (inputCents < 0) {
     excedeTeto = true;
     mensagemErroTeto = 'O valor do desconto não pode ser negativo.';
