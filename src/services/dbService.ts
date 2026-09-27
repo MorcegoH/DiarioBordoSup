@@ -307,7 +307,7 @@ function generateRestorePointSQL(
     solicitacoes.forEach((s) => {
       const cliStr = (s.cliente || '').replace(/'/g, "''");
       const placaStr = (s.placa || '').replace(/'/g, "''");
-      const consStr = (s.consultor || '').replace(/'/g, "''");
+      const consStr = (s.consultor === 'Kelvin' ? 'Kelvyn' : (s.consultor || '')).replace(/'/g, "''");
       const supStr = (s.supervisora || '').replace(/'/g, "''");
       const justStr = (s.justificativa || '').replace(/'/g, "''");
       const parecerStr = (s.parecer || '').replace(/'/g, "''");
@@ -339,7 +339,7 @@ function generateRestorePointSQL(
       const aprovadorStr = (v.aprovador || '').replace(/'/g, "''");
       const motivoReprovStr = (v.motivoReprovacao || '').replace(/'/g, "''");
       const aprovVal = v.dataHoraAprovacao ? `'${v.dataHoraAprovacao}'` : 'NULL';
-      const solicitanteStr = (v.solicitante || '').replace(/'/g, "''");
+      const solicitanteStr = (v.solicitante === 'Kelvin' ? 'Kelvyn' : (v.solicitante || '')).replace(/'/g, "''");
 
       sql += `INSERT INTO public.solicitacoes_vistoria (id, data_hora_solicitacao, data_vistoria, horario_vistoria, valor_adesao, adesao_paga, vistoriador, nome_associado, contato, localizacao_maps, modelo_carro, placa, tipo_placa, link_vistoria, link_pagamento, solicitante, status, data_hora_aprovacao, parecer, aprovador, motivo_reprovacao)\n`;
       sql += `VALUES ('${v.id}', '${v.dataHoraSolicitacao}', '${v.dataVistoria}', '${v.horarioVistoria}', ${v.valorAdesao}, ${v.adesaoPaga}, '${v.vistoriador}', '${assocStr}', '${contatoStr}', '${mapsStr}', '${carroStr}', '${placaStr}', '${v.tipoPlaca || 'Mercosul'}', '${vistLinkStr}', '${pagLinkStr}', '${solicitanteStr}', '${v.status}', ${aprovVal}, '${parecerStr}', '${aprovadorStr}', '${motivoReprovStr}')\n`;

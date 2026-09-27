@@ -718,7 +718,6 @@ export const OccurrenceHistory: React.FC<OccurrenceHistoryProps> = React.memo(({
                     >
                       <option value="Heder Santos">Heder Santos (Gerente)</option>
                       <option value="Débora Rodrigues">Débora Rodrigues</option>
-                      <option value="Marília Farias">Marília Farias</option>
                     </select>
                   </div>
 

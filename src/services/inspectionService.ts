@@ -35,7 +35,7 @@ export function mapVistoriaFromDB(row: any): SolicitacaoVistoria {
     tipoPlaca: infoPlaca.formato === 'Mercosul' ? 'Mercosul' : (infoPlaca.formato === 'Antigo' ? 'Tradicional' : 'Inválida'),
     linkVistoria: sanitizeTextInput(row.link_vistoria || '', 2000),
     linkPagamento: sanitizeTextInput(row.link_pagamento || '', 2000),
-    solicitante: row.solicitante ? sanitizeTextInput(row.solicitante, 100) : undefined,
+    solicitante: row.solicitante ? (row.solicitante === 'Kelvin' ? 'Kelvyn' : sanitizeTextInput(row.solicitante, 100)) : undefined,
     status: (row.status || 'Aguardando Vistoria') as StatusVistoria,
     dataHoraAprovacao: row.data_hora_aprovacao ?? undefined,
     parecer: row.parecer ? sanitizeTextInput(row.parecer, 2000) : undefined,
@@ -49,6 +49,7 @@ export function mapVistoriaFromDB(row: any): SolicitacaoVistoria {
  */
 export function mapVistoriaToDB(item: SolicitacaoVistoria) {
   const dataRef = item.dataHoraSolicitacao || new Date().toISOString();
+  const solicitante = item.solicitante === 'Kelvin' ? 'Kelvyn' : item.solicitante;
   return {
     id: item.id,
     data_hora_solicitacao: dataRef,
@@ -65,7 +66,7 @@ export function mapVistoriaToDB(item: SolicitacaoVistoria) {
     tipo_placa: item.tipoPlaca || null,
     link_vistoria: item.linkVistoria,
     link_pagamento: item.linkPagamento,
-    solicitante: item.solicitante || null,
+    solicitante: solicitante || null,
     status: item.status,
     data_hora_aprovacao: item.dataHoraAprovacao || null,
     parecer: item.parecer || null,
@@ -95,11 +96,23 @@ export const inspectionService = {
   getVistorias(): SolicitacaoVistoria[] {
     const parsed = safeLocalStorageGetJSON<SolicitacaoVistoria[]>(LOCAL_STORAGE_KEY, []);
     if (Array.isArray(parsed)) {
+      let alterado = false;
       const limpas = parsed.filter((item) => !isExemploVistoria(item));
       if (limpas.length !== parsed.length) {
-        this.saveToLocalStorage(limpas);
+        alterado = true;
       }
-      return limpas;
+      const normalizadas = limpas.map((item) => {
+        if (item.solicitante === 'Kelvin') {
+          alterado = true;
+          return { ...item, solicitante: 'Kelvyn' };
+        }
+        return item;
+      });
+
+      if (alterado) {
+        this.saveToLocalStorage(normalizadas);
+      }
+      return normalizadas;
     }
     return [];
   },
@@ -120,6 +133,14 @@ export const inspectionService = {
 
     if (isSupabaseConfigured && supabase) {
       try {
+        // Autocorreção idempotente em background: atualiza solicitante 'Kelvin' para 'Kelvyn' no Supabase
+        Promise.resolve(
+          supabase
+            .from('solicitacoes_vistoria')
+            .update({ solicitante: 'Kelvyn' })
+            .eq('solicitante', 'Kelvin')
+        ).catch(() => {});
+
         // Remove quaisquer registros de exemplo que possam ter sido gravados no Supabase
         try {
           await supabase.from('solicitacoes_vistoria').delete().in('id', ['vis-101', 'vis-102', 'vis-103']);

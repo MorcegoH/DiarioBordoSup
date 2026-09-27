@@ -38,12 +38,10 @@ export const BudgetPanel: React.FC<BudgetPanelProps> = React.memo(({
   // Saldo Total consolidado = saldo Débora (unificado R$ 700) + Reserva Gerente (R$ 200)
   const saldoTotalDepartamento = 
     budget.debora.saldoDisponivel + 
-    (budget.marilia?.saldoDisponivel || 0) + 
     budget.reservaGerente;
 
   const totalGastoDepartamento = 
     budget.debora.totalUtilizado + 
-    (budget.marilia?.totalUtilizado || 0) +
     (budget.gerente?.totalUtilizado || 0);
 
   const percentualTotalGasto = Math.min(100, (totalGastoDepartamento / budget.tetoTotalDepartamento) * 100);

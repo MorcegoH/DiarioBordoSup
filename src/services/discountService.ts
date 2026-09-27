@@ -26,12 +26,17 @@ const MESES_CURTOS = [
  * Mapeador de linha do Banco de Dados para TypeScript
  */
 function mapSolicitacaoFromDB(row: any): SolicitacaoDesconto {
+  const consultorRaw = sanitizeTextInput(row.consultor || '', 100);
+  const consultor = consultorRaw === 'Kelvin' ? 'Kelvyn' : consultorRaw;
+  const aprovadorRaw = row.aprovador ? sanitizeTextInput(row.aprovador, 100) : undefined;
+  const aprovador = aprovadorRaw === 'Kelvin' ? 'Kelvyn' : aprovadorRaw;
+
   return {
     id: String(row.id || ''),
     dataHoraSolicitacao: row.data_hora_solicitacao,
     cliente: sanitizeTextInput(row.cliente || '', 120),
     placa: sanitizeTextInput(row.placa || '', 10),
-    consultor: sanitizeTextInput(row.consultor || '', 100),
+    consultor,
     supervisora: sanitizeTextInput(row.supervisora || '', 100),
     tipoDesconto: row.tipo_desconto === 'Plano' ? 'Plano' : 'Adesão',
     valorCheio: Number(row.valor_cheio ?? 0),
@@ -43,7 +48,7 @@ function mapSolicitacaoFromDB(row: any): SolicitacaoDesconto {
     status: row.status === 'Aprovado' ? 'Aprovado' : (row.status === 'Negado' ? 'Negado' : 'Aguardando Aprovação'),
     dataHoraAprovacao: row.data_hora_aprovacao ?? undefined,
     parecer: row.parecer ? sanitizeTextInput(row.parecer, 1500) : undefined,
-    aprovador: row.aprovador ? sanitizeTextInput(row.aprovador, 100) : undefined,
+    aprovador,
     tipoRegistro: row.tipo_registro ?? 'SolicitacaoSupervisao'
   };
 }
@@ -53,13 +58,14 @@ function mapSolicitacaoFromDB(row: any): SolicitacaoDesconto {
  */
 export function mapSolicitacaoToDB(item: SolicitacaoDesconto) {
   const dataRef = item.dataHoraSolicitacao || new Date().toISOString();
+  const consultor = item.consultor === 'Kelvin' ? 'Kelvyn' : item.consultor;
   return {
     id: item.id,
     data_hora_solicitacao: dataRef,
     mes_competencia: extrairMesAno(dataRef),
     cliente: item.cliente,
     placa: item.placa,
-    consultor: item.consultor,
+    consultor,
     supervisora: item.supervisora,
     tipo_desconto: item.tipoDesconto,
     valor_cheio: item.valorCheio,
@@ -139,12 +145,38 @@ class DiscountService {
   getLocalSolicitacoes(): SolicitacaoDesconto[] {
     const parsed = safeLocalStorageGetJSON<SolicitacaoDesconto[]>(LOCAL_STORAGE_KEY, []);
     if (Array.isArray(parsed)) {
+      let alterado = false;
       // Filtra itens de teste antigos se existirem
       const limpos = parsed.filter(item => !item.id?.startsWith('desc-20260815-') && !item.id?.startsWith('desc-20260814-') && !item.id?.startsWith('desc-20260813-'));
       if (limpos.length !== parsed.length) {
-        this.saveToStorage(limpos);
+        alterado = true;
       }
-      return limpos;
+      // Normalização e autocorreção: garante que "Kelvin" seja sempre migrado para "Kelvyn"
+      const normalizados = limpos.map(item => {
+        let mudou = false;
+        let novoConsultor = item.consultor;
+        let novoAprovador = item.aprovador;
+
+        if (item.consultor === 'Kelvin') {
+          novoConsultor = 'Kelvyn';
+          mudou = true;
+        }
+        if (item.aprovador === 'Kelvin') {
+          novoAprovador = 'Kelvyn';
+          mudou = true;
+        }
+
+        if (mudou) {
+          alterado = true;
+          return { ...item, consultor: novoConsultor, aprovador: novoAprovador };
+        }
+        return item;
+      });
+
+      if (alterado) {
+        this.saveToStorage(normalizados);
+      }
+      return normalizados;
     }
     return [];
   }
@@ -157,11 +189,68 @@ class DiscountService {
   }
 
   /**
+   * Executa a migração/normalização de nomes legados (ex: 'Kelvin' -> 'Kelvyn')
+   * Atualiza o LocalStorage imediatamente e, caso o Supabase esteja conectado, envia a instrução UPDATE.
+   */
+  async normalizarConsultoresLegados(): Promise<{ corrigidosLocal: number; corrigidosRemoto: boolean }> {
+    let corrigidosLocal = 0;
+    const locais = safeLocalStorageGetJSON<SolicitacaoDesconto[]>(LOCAL_STORAGE_KEY, []);
+    if (Array.isArray(locais)) {
+      const atualizados = locais.map(item => {
+        let mudou = false;
+        let c = item.consultor;
+        let a = item.aprovador;
+        if (item.consultor === 'Kelvin') {
+          c = 'Kelvyn';
+          mudou = true;
+        }
+        if (item.aprovador === 'Kelvin') {
+          a = 'Kelvyn';
+          mudou = true;
+        }
+        if (mudou) {
+          corrigidosLocal++;
+          return { ...item, consultor: c, aprovador: a };
+        }
+        return item;
+      });
+      if (corrigidosLocal > 0) {
+        this.saveToStorage(atualizados);
+      }
+    }
+
+    let corrigidosRemoto = false;
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { error } = await supabase
+          .from('solicitacoes_desconto')
+          .update({ consultor: 'Kelvyn' })
+          .eq('consultor', 'Kelvin');
+        if (!error) {
+          corrigidosRemoto = true;
+        }
+      } catch (err) {
+        console.warn('Erro ao atualizar Kelvin para Kelvyn no Supabase:', err);
+      }
+    }
+
+    return { corrigidosLocal, corrigidosRemoto };
+  }
+
+  /**
    * Carrega as solicitações do Supabase ou LocalStorage
    */
   async getSolicitacoesAsync(): Promise<SolicitacaoDesconto[]> {
     if (isSupabaseConfigured && supabase) {
       try {
+        // Autocorreção idempotente em background: atualiza registros legados com Kelvin no Supabase
+        Promise.resolve(
+          supabase
+            .from('solicitacoes_desconto')
+            .update({ consultor: 'Kelvyn' })
+            .eq('consultor', 'Kelvin')
+        ).catch(() => {});
+
         const { data, error } = await supabase
           .from('solicitacoes_desconto')
           .select('*')
@@ -410,12 +499,6 @@ class DiscountService {
         totalUtilizado: deboraGasto,
         saldoDisponivel: deboraSaldo,
         totalPendente: deboraPendente
-      },
-      marilia: {
-        tetoMensal: 0,
-        totalUtilizado: 0,
-        saldoDisponivel: 0,
-        totalPendente: 0
       },
       ciclo
     };

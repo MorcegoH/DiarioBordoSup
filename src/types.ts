@@ -189,7 +189,6 @@ export interface BudgetState {
   reservaGerente: number; // R$ 100,00
   gerente?: BudgetManager;
   debora: BudgetSupervisor; // R$ 800,00 base unificada
-  marilia?: BudgetSupervisor; // retrocompatibilidade
   ciclo: BudgetCycleInfo;
 }
 

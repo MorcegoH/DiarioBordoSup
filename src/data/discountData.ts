@@ -15,15 +15,14 @@ export const HIERARQUIA_EQUIPES = {
       'Erick',
       'Everton',
       'Felipe',
-      'Gabriela',
       'Hevely',
-      'Hillary',
-      'Kelvin',
       'Kelvyn',
       'Naderson',
       'Roney',
       'Rute',
-      'Thalia'
+      'Thalia',
+      'Thalita',
+      'Yasmin'
     ]
   }
 } as const;

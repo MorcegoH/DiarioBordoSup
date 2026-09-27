@@ -122,7 +122,7 @@ export function gerarDadosSimuladosDesconto(): SolicitacaoDesconto[] {
       // Alguns consultores pedem mais frequentemente (para criar variabilidade na matriz de calor)
       let consultor = consultores[idCounter % consultores.length];
       if (k === 0 && (idCounter % 4 === 0)) consultor = 'Everton'; // Mais dependente
-      if (k === 0 && (idCounter % 4 === 2)) consultor = 'Kelvin'; // Mais dependente
+      if (k === 0 && (idCounter % 4 === 2)) consultor = 'Kelvyn'; // Mais dependente
 
       const isAdesao = (idCounter % 3 !== 0);
       const tipoDesconto: TipoDesconto = isAdesao ? 'Adesão' : 'Plano';
