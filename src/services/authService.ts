@@ -577,12 +577,26 @@ CREATE TABLE IF NOT EXISTS public.app_users_auth (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     username TEXT UNIQUE NOT NULL,
     name TEXT NOT NULL,
-    role TEXT NOT NULL DEFAULT 'supervisor', -- 'manager' | 'supervisor' | 'apoio'
+    role TEXT NOT NULL DEFAULT 'supervisor',
     cargo TEXT NOT NULL,
     salt TEXT NOT NULL,
     hash_sha256 TEXT NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Remove eventuais constraints de validação antigas ou restritivas na coluna role
+DO $$
+BEGIN
+    ALTER TABLE public.app_users_auth DROP CONSTRAINT IF EXISTS app_users_auth_role_check;
+    ALTER TABLE public.app_users_auth DROP CONSTRAINT IF EXISTS users_role_check;
+EXCEPTION
+    WHEN OTHERS THEN NULL;
+END $$;
+
+-- Adiciona a validação atualizada permitindo os perfis ativos da operação ('manager', 'supervisor', 'apoio')
+ALTER TABLE public.app_users_auth 
+  ADD CONSTRAINT app_users_auth_role_check 
+  CHECK (role IN ('manager', 'supervisor', 'apoio', 'gestor', 'admin'));
 
 -- Habilitar RLS (Row Level Security)
 ALTER TABLE public.app_users_auth ENABLE ROW LEVEL SECURITY;
@@ -597,13 +611,17 @@ DROP POLICY IF EXISTS "Permitir atualizacao de credenciais" ON public.app_users_
 CREATE POLICY "Permitir atualizacao de credenciais"
 ON public.app_users_auth FOR ALL USING (true);
 
--- Inserção inicial padrão (Heder Santos, Débora Rodrigues e Erick Thomas com Hashes SHA-256)
+-- Inserção ou atualização segura dos usuários e credenciais iniciais
 INSERT INTO public.app_users_auth (username, name, role, cargo, salt, hash_sha256)
 VALUES 
   ('heder.santos', 'Heder Santos', 'manager', 'Gerente de Inside Sales', 'salt_user_heder_santos_2026', 'e5f1f67dff0a73343d98aa76a4b528964dd95c3e11e6d39a6c79824b11c551aa'),
   ('debora.rodrigues', 'Débora Rodrigues', 'supervisor', 'Supervisora de Inside Sales', 'salt_user_debora_rodrigues_2026', 'ac05396f1569d51d52df65f5456402f8bb8506fc9e06214d5bddc68584cfb6aa'),
   ('erick.thomas', 'Erick Thomas', 'apoio', 'Apoio à Supervisão', 'salt_user_erick_thomas_2026', '1fc0517bd74cf8c1514fae022764f43b85e20da4db23b64f0b0f7de0f68a7880')
-ON CONFLICT (username) DO NOTHING;
+ON CONFLICT (username) DO UPDATE SET
+  name = EXCLUDED.name,
+  role = EXCLUDED.role,
+  cargo = EXCLUDED.cargo,
+  updated_at = timezone('utc'::text, now());
 `;
   }
 }

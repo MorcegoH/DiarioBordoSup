@@ -41,6 +41,14 @@ function parseHistorico(val: any) {
 }
 
 function mapOcorrenciaFromDB(row: any): Ocorrencia {
+  // Garantir higienização retroativa de Kelvin -> Kelvyn
+  let rawConsultor = row.consultor || row.conteudo?.consultor || undefined;
+  if (rawConsultor && String(rawConsultor).trim().toLowerCase() === 'kelvin') {
+    rawConsultor = 'Kelvyn';
+  }
+
+  const tipoRegistro = row.tipo_registro || row.tipoRegistro || (rawConsultor ? 'fato_consultor' : 'operacional');
+
   return {
     id: String(row.id || ''),
     dataHora: row.data_hora,
@@ -52,11 +60,30 @@ function mapOcorrenciaFromDB(row: any): Ocorrencia {
     acaoTomada: sanitizeTextInput(row.acao_tomada || '', 2000),
     status: row.status,
     duracaoMinutos: Number(row.duracao_minutos ?? 0),
-    historicoAtualizacoes: parseHistorico(row.historico_atualizacoes)
+    historicoAtualizacoes: parseHistorico(row.historico_atualizacoes),
+    
+    // Suporte aos campos de Registros Factuais de Consultores
+    tipoRegistro: tipoRegistro,
+    consultor: rawConsultor ? sanitizeTextInput(rawConsultor, 100) : undefined,
+    tipoFato: row.tipo_fato || row.tipoFato || undefined,
+    statusFeedback: row.status_feedback || row.statusFeedback || (rawConsultor ? 'Não Aplicado' : undefined),
+    dataFeedback: row.data_feedback || row.dataFeedback || undefined,
+    observacoesFeedback: row.observacoes_feedback || row.observacoesFeedback ? sanitizeTextInput(row.observacoes_feedback || row.observacoesFeedback, 2000) : undefined,
+    
+    // Auditoria e rastreabilidade estrita de login
+    gestorRegistro: row.gestor_registro || row.gestorRegistro || sanitizeTextInput(row.supervisor || '', 100),
+    dataHoraCriacao: row.data_hora_criacao || row.dataHoraCriacao || row.data_hora || undefined,
+    gestorFeedback: row.gestor_feedback || row.gestorFeedback || undefined,
+    dataHoraFeedback: row.data_hora_feedback || row.dataHoraFeedback || row.data_feedback || undefined
   };
 }
 
 function mapOcorrenciaToDB(item: Ocorrencia) {
+  let consultorHigienizado = item.consultor;
+  if (consultorHigienizado && consultorHigienizado.trim().toLowerCase() === 'kelvin') {
+    consultorHigienizado = 'Kelvyn';
+  }
+
   return {
     id: item.id,
     data_hora: item.dataHora,
@@ -68,7 +95,21 @@ function mapOcorrenciaToDB(item: Ocorrencia) {
     acao_tomada: item.acaoTomada,
     status: item.status,
     duracao_minutos: item.duracaoMinutos ?? 0,
-    historico_atualizacoes: item.historicoAtualizacoes || []
+    historico_atualizacoes: item.historicoAtualizacoes || [],
+    
+    // Novos campos
+    tipo_registro: item.tipoRegistro || 'operacional',
+    consultor: consultorHigienizado || null,
+    tipo_fato: item.tipoFato || null,
+    status_feedback: item.statusFeedback || null,
+    data_feedback: item.dataFeedback || null,
+    observacoes_feedback: item.observacoesFeedback || null,
+
+    // Auditoria e rastreabilidade de login
+    gestor_registro: item.gestorRegistro || item.supervisor || null,
+    data_hora_criacao: item.dataHoraCriacao || item.dataHora || null,
+    gestor_feedback: item.gestorFeedback || null,
+    data_hora_feedback: item.dataHoraFeedback || item.dataFeedback || null
   };
 }
 
@@ -601,8 +642,15 @@ export const dbService = {
     }
 
     try {
-      const payload = mapOcorrenciaToDB(nova);
-      const { error } = await supabase.from('ocorrencias').insert([payload]);
+      let payload: any = mapOcorrenciaToDB(nova);
+      let { error } = await supabase.from('ocorrencias').insert([payload]);
+
+      // Se der erro 42703 (coluna inexistente no schema atual do Supabase), tentar salvar apenas com os campos essenciais
+      if (error && error.code === '42703') {
+        const { gestor_registro, data_hora_criacao, gestor_feedback, data_hora_feedback, historico_atualizacoes, ...payloadCompativel } = payload;
+        const retryRes = await supabase.from('ocorrencias').insert([payloadCompativel]);
+        error = retryRes.error;
+      }
 
       if (error) {
         console.error('Erro de gravação no Supabase:', error);
@@ -658,10 +706,10 @@ export const dbService = {
       let payload: any = mapOcorrenciaToDB(item);
       let { error } = await supabase.from('ocorrencias').update(payload).eq('id', item.id);
       
-      // Se der erro de coluna inexistente (ex: historico_atualizacoes ainda não foi criada via SQL)
+      // Se der erro de coluna inexistente (ex: campos novos ainda não criados via SQL)
       if (error && error.code === '42703') {
-        const { historico_atualizacoes, ...payloadSemHistorico } = payload;
-        const retryRes = await supabase.from('ocorrencias').update(payloadSemHistorico).eq('id', item.id);
+        const { gestor_registro, data_hora_criacao, gestor_feedback, data_hora_feedback, historico_atualizacoes, ...payloadCompativel } = payload;
+        const retryRes = await supabase.from('ocorrencias').update(payloadCompativel).eq('id', item.id);
         error = retryRes.error;
       }
 

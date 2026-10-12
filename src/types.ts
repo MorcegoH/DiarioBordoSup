@@ -58,6 +58,25 @@ export interface RegistroAtualizacao {
 /**
  * Representa um registro individual de ocorrência operacional de vendas.
  */
+export type TipoRegistroOcorrencia = 'operacional' | 'fato_consultor';
+
+export type TipoFatoConsultor = 
+  | 'Pontualidade'
+  | 'Postura'
+  | 'Processo'
+  | 'Elogio'
+  | 'Desempenho'
+  | 'Comunicação'
+  | 'Outro';
+
+export type StatusFeedback = 
+  | 'Não Aplicado'
+  | 'Agendado'
+  | 'Aplicado / Concluído';
+
+/**
+ * Representa um registro individual de ocorrência operacional de vendas ou fato de consultor para feedback.
+ */
 export interface Ocorrencia {
   id: string;
   dataHora: string; // ISO string de data e hora do registro
@@ -70,6 +89,20 @@ export interface Ocorrencia {
   status: Status;
   duracaoMinutos?: number; // Duração estimada para resolução (se resolvido)
   historicoAtualizacoes?: RegistroAtualizacao[]; // Registro de atualizações de andamento no Card de Trabalho
+  
+  // Campos específicos para Registros Factuais de Consultores (Gestão & 1-on-1 Feedback)
+  tipoRegistro?: TipoRegistroOcorrencia; // 'operacional' (padrão) ou 'fato_consultor'
+  consultor?: string; // Nome do consultor envolvido (ex: 'Kelvyn', 'Erick', 'Charlene', etc.)
+  tipoFato?: TipoFatoConsultor; // Pontualidade, Postura, Processo, Elogio, Desempenho, etc.
+  statusFeedback?: StatusFeedback; // 'Não Aplicado', 'Agendado', 'Aplicado / Concluído'
+  dataFeedback?: string; // Data em que o feedback foi aplicado/agendado (ISO ou YYYY-MM-DD)
+  observacoesFeedback?: string; // Notas de alinhamento decorrentes do feedback 1-on-1
+  
+  // Auditoria e rastreabilidade estrita de login
+  gestorRegistro?: string; // Nome do gestor que registrou o fato/ocorrência por meio de login
+  dataHoraCriacao?: string; // Data e horário exatos de gravação no sistema (ISO)
+  gestorFeedback?: string; // Nome do gestor que conduziu e salvou o feedback/dossiê por meio de login
+  dataHoraFeedback?: string; // Data e horário exatos em que o feedback/dossiê foi salvo (ISO)
 }
 
 /**
@@ -124,6 +157,10 @@ export interface FiltrosOcorrencia {
   impacto: string;
   status: string;
   supervisor: string;
+  tipoRegistro?: string; // 'todos' | 'operacional' | 'fato_consultor'
+  consultor?: string;
+  tipoFato?: string;
+  statusFeedback?: string;
   dataInicio?: string;
   dataFim?: string;
 }

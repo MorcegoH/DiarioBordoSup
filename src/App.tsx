@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Ocorrencia, ResumoPassagem, Status, AuthUser } from './types';
+import { Ocorrencia, ResumoPassagem, Status, AuthUser, TipoRegistroOcorrencia } from './types';
 import { INITIAL_MOCK_OCORRENCIAS, INITIAL_MOCK_PASSAGENS } from './data/mockData';
 import { dbService } from './services/dbService';
 import { discountService } from './services/discountService';
@@ -32,6 +32,9 @@ export default function App() {
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>(INITIAL_MOCK_OCORRENCIAS);
   const [passagens, setPassagens] = useState<ResumoPassagem[]>(INITIAL_MOCK_PASSAGENS);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Sincronização entre a seleção de tipo de registro no formulário e a filtragem da tabela abaixo
+  const [tipoRegistroFiltro, setTipoRegistroFiltro] = useState<'todas' | 'operacional' | 'fato_consultor' | 'dossie'>('todas');
 
   // Handler de Logout
   const handleLogout = useCallback(() => {
@@ -274,14 +277,25 @@ export default function App() {
             <OccurrenceForm 
               onAddOcorrencia={handleAddOcorrencia} 
               defaultSupervisor={currentUser.name}
+              currentUser={currentUser}
+              tipoRegistroAtivo={tipoRegistroFiltro === 'dossie' || tipoRegistroFiltro === 'todas' ? undefined : tipoRegistroFiltro}
+              onTipoRegistroChange={(novoTipo) => {
+                // A seleção acima de qual assunto será registrado funciona também como filtro na tabela abaixo
+                setTipoRegistroFiltro(novoTipo);
+              }}
             />
 
-            {/* SEÇÃO 3: Histórico de Ocorrências */}
+            {/* SEÇÃO 3: Histórico de Ocorrências com Tabela Filtrada Conforme Assunto Selecionado */}
             <OccurrenceHistory
               ocorrencias={ocorrencias}
               onDeleteOcorrencia={handleDeleteOcorrencia}
               onUpdateStatus={handleUpdateStatus}
               onUpdateOcorrencia={handleUpdateOcorrencia}
+              tipoRegistroFiltro={tipoRegistroFiltro}
+              onTipoRegistroFiltroChange={(novoFiltro) => {
+                setTipoRegistroFiltro(novoFiltro);
+              }}
+              currentUser={currentUser}
             />
           </div>
         )}
