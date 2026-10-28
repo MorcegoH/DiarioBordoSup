@@ -42,7 +42,7 @@ export const Header: React.FC<HeaderProps> = React.memo(({
   const [timeString, setTimeString] = useState<string>('');
   const [healthStatus, setHealthStatus] = useState<DbHealthStatus>(dbService.getHealthStatus());
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
-  const [modalInitialTab, setModalInitialTab] = useState<'visao_geral' | 'diagnostico' | 'backup_reset' | 'gestao_senhas' | undefined>(undefined);
+  const [modalInitialTab, setModalInitialTab] = useState<'visao_geral' | 'diagnostico' | 'script_sql' | 'backup_reset' | 'gestao_senhas' | undefined>(undefined);
 
   useEffect(() => {
     const updateTime = () => {

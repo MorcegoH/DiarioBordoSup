@@ -55,7 +55,7 @@ interface DatabaseErrorModalProps {
   onSyncComplete?: () => void;
   onDataResetOrRestored?: () => void;
   currentUser?: AuthUser | null;
-  initialTab?: 'visao_geral' | 'diagnostico' | 'backup_reset' | 'gestao_senhas';
+  initialTab?: 'visao_geral' | 'diagnostico' | 'script_sql' | 'backup_reset' | 'gestao_senhas';
 }
 
 export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
@@ -70,7 +70,7 @@ export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
 }) => {
   const isHealthy = healthStatus.isConnected && !healthStatus.errorCode;
 
-  const [activeTab, setActiveTab] = useState<'visao_geral' | 'diagnostico' | 'backup_reset' | 'gestao_senhas'>(
+  const [activeTab, setActiveTab] = useState<'visao_geral' | 'diagnostico' | 'script_sql' | 'backup_reset' | 'gestao_senhas'>(
     initialTab || (isHealthy ? 'visao_geral' : 'diagnostico')
   );
 
@@ -85,6 +85,7 @@ export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedEmail, setCopiedEmail] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
 
   // Diagnóstico
   const [diagResult, setDiagResult] = useState<{
@@ -170,6 +171,13 @@ export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
     navigator.clipboard.writeText('heder.santos@adarco.com.br');
     setCopiedEmail(true);
     setTimeout(() => setCopiedEmail(false), 2000);
+  };
+
+  const handleCopySql = () => {
+    const sql = dbService.getFullDatabaseSetupSQL();
+    navigator.clipboard.writeText(sql);
+    setCopiedSql(true);
+    setTimeout(() => setCopiedSql(false), 2000);
   };
 
   // --- Handlers da Aba 3 ---
@@ -353,7 +361,20 @@ export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
             )}
           </button>
 
-          {/* Aba 3: Limpar e Backup */}
+          {/* Aba 3: Script SQL do Banco */}
+          <button
+            onClick={() => setActiveTab('script_sql')}
+            className={`px-3 sm:px-4 py-2 text-xs font-bold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+              activeTab === 'script_sql'
+                ? 'border-emerald-700 text-emerald-900 bg-white rounded-t-lg shadow-2xs font-extrabold'
+                : 'border-transparent text-gray-500 hover:text-gray-800'
+            }`}
+          >
+            <Code className="w-3.5 h-3.5 text-emerald-700" />
+            <span>Script SQL do Banco</span>
+          </button>
+
+          {/* Aba 4: Limpar e Backup */}
           <button
             onClick={() => setActiveTab('backup_reset')}
             className={`px-3 sm:px-4 py-2 text-xs font-bold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
@@ -582,6 +603,39 @@ export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
                     </div>
                   )}
 
+                  {/* Card Específico de Projeto Pausado ou Falha de Fetch */}
+                  {(healthStatus.errorCode === 'ERR_SUPABASE_PAUSED_OR_NETWORK' || healthStatus.errorMessage?.includes('Failed to fetch') || healthStatus.errorCode === 'PGRST_ERROR') && (
+                    <div className="bg-amber-50 border-2 border-amber-400 p-4 rounded-xl space-y-2.5 text-xs text-amber-950 shadow-xs">
+                      <div className="flex items-center gap-2 text-amber-900 font-bold">
+                        <AlertOctagon className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>Atenção: Projeto Supabase Pausado por Inatividade ou Bloqueio de Rede</span>
+                      </div>
+                      <p className="leading-relaxed text-amber-900">
+                        O erro <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-bold text-amber-950">TypeError: Failed to fetch</code> indica que o navegador não conseguiu estabelecer comunicação com a URL do Supabase. No plano gratuito do Supabase, projetos sem requisições por 7 dias entram em <strong>Pausa Automática (Project Paused)</strong>.
+                      </p>
+                      <div className="bg-white p-3 rounded-lg border border-amber-300 space-y-1.5 text-amber-900">
+                        <strong className="block text-amber-950">Como Resolver em 3 Passos Rápidos:</strong>
+                        <ol className="list-decimal list-inside space-y-1 leading-relaxed">
+                          <li>Acesse <strong><a href="https://supabase.com/dashboard" target="_blank" rel="noopener noreferrer" className="text-emerald-700 underline font-bold">supabase.com/dashboard</a></strong> e faça login com sua conta.</li>
+                          <li>Se o seu projeto estiver marcado como <em>"Paused"</em>, clique no botão verde <strong>"Restore Project"</strong> (o restabelecimento leva cerca de 60 segundos).</li>
+                          <li>Na Vercel (onde está hospedado <em>diario-bordo-sup.vercel.app</em>), confirme em <strong>Project Settings &gt; Environment Variables</strong> se as variáveis <code className="font-mono bg-gray-100 px-1 font-bold">VITE_SUPABASE_URL</code> e <code className="font-mono bg-gray-100 px-1 font-bold">VITE_SUPABASE_ANON_KEY</code> estão configuradas e faça um <em>Redeploy</em>.</li>
+                        </ol>
+                      </div>
+                      <div className="flex items-center justify-between pt-1">
+                        <span className="text-[11px] text-amber-800">
+                          🛡️ <strong>Zero Perda de Dados:</strong> Todos os lançamentos estão preservados na memória local.
+                        </span>
+                        <button
+                          onClick={() => setActiveTab('script_sql')}
+                          className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded text-xs transition-colors flex items-center gap-1 cursor-pointer"
+                        >
+                          <Code className="w-3.5 h-3.5" />
+                          <span>Ver Script SQL das Tabelas</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Sinalização para Contatar Administrador */}
                   <div className="bg-amber-50 border border-amber-300 p-3.5 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-950">
                     <div className="flex items-center gap-2.5">
@@ -705,7 +759,72 @@ export const DatabaseErrorModal: React.FC<DatabaseErrorModalProps> = ({
             </div>
           )}
 
-          {/* ================= ABA 3: LIMPAR E BACKUP ================= */}
+          {/* ================= ABA: SCRIPT SQL DO BANCO ================= */}
+          {activeTab === 'script_sql' && (
+            <div className="space-y-4 animate-in fade-in duration-150">
+              <div className="bg-emerald-900 text-white p-4 rounded-xl shadow-xs space-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <Code className="w-5 h-5 text-emerald-300 shrink-0" />
+                    <div>
+                      <h4 className="font-bold text-sm">
+                        Script SQL Completo & Políticas RLS (PostgreSQL Supabase)
+                      </h4>
+                      <p className="text-xs text-emerald-100/90">
+                        Criação das tabelas de Ocorrências, Turnos, Descontos, Vistorias, Usuários e Backups.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleCopySql}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-xs cursor-pointer shrink-0"
+                  >
+                    {copiedSql ? (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Copiado com Sucesso!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copiar Script SQL</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg text-xs text-blue-900 space-y-1.5">
+                <p className="font-bold flex items-center gap-1.5 text-blue-950">
+                  <HelpCircle className="w-4 h-4 text-blue-700 shrink-0" />
+                  Passo a Passo para Executar no Supabase:
+                </p>
+                <ol className="list-decimal list-inside space-y-1 text-blue-900 leading-relaxed">
+                  <li>Acesse o painel do seu projeto no Supabase: <strong>https://supabase.com/dashboard</strong>.</li>
+                  <li>No menu lateral esquerdo, clique no ícone <strong>SQL Editor</strong>.</li>
+                  <li>Clique em <strong>"New Query"</strong>, cole o script SQL abaixo e clique no botão verde <strong>"Run"</strong> (ou pressione Ctrl+Enter).</li>
+                  <li>Pronto! Todas as tabelas e permissões de segurança RLS estarão criadas e sincronizadas.</li>
+                </ol>
+              </div>
+
+              <div className="relative">
+                <div className="absolute top-2.5 right-2.5 z-10">
+                  <button
+                    onClick={handleCopySql}
+                    className="px-3 py-1 bg-gray-800/90 hover:bg-gray-700 text-white text-xs font-bold rounded border border-gray-600 transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
+                  >
+                    {copiedSql ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedSql ? 'Copiado!' : 'Copiar'}</span>
+                  </button>
+                </div>
+                <pre className="p-4 pt-10 bg-gray-950 text-emerald-400 font-mono text-[11px] sm:text-xs rounded-xl overflow-x-auto max-h-[380px] border border-gray-800 leading-relaxed select-all">
+                  <code>{dbService.getFullDatabaseSetupSQL()}</code>
+                </pre>
+              </div>
+            </div>
+          )}
+
+          {/* ================= ABA 4: LIMPAR E BACKUP ================= */}
           {activeTab === 'backup_reset' && (
             <div className="space-y-6 animate-in fade-in duration-150">
               

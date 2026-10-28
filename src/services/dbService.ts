@@ -404,6 +404,182 @@ export const dbService = {
   },
 
   /**
+   * Retorna o Script SQL Completo e Unificado para criação de todas as tabelas e políticas RLS no Supabase
+   */
+  getFullDatabaseSetupSQL(): string {
+    return `-- =========================================================================
+-- DIÁRIO DE BORDO INSIDE SALES - SCRIPT DDL E SEGURANÇA SUPABASE POSTGRESQL
+-- Executar no SQL Editor do Supabase (https://supabase.com/dashboard)
+-- Cria todas as tabelas (Ocorrências, Turnos, Descontos, Vistorias, Usuários e Backups)
+-- =========================================================================
+
+-- 1. TABELA DE OCORRÊNCIAS OPERACIONAIS E REGISTROS FACTUAIS
+CREATE TABLE IF NOT EXISTS public.ocorrencias (
+    id TEXT PRIMARY KEY,
+    data_hora TIMESTAMPTZ NOT NULL,
+    data_hora_conclusao TIMESTAMPTZ,
+    supervisor TEXT NOT NULL,
+    categoria TEXT NOT NULL,
+    descricao TEXT NOT NULL,
+    impacto TEXT NOT NULL,
+    acao_tomada TEXT NOT NULL,
+    status TEXT NOT NULL,
+    duracao_minutos INTEGER DEFAULT 0,
+    historico_atualizacoes JSONB DEFAULT '[]'::jsonb,
+    tipo_registro TEXT DEFAULT 'operacional',
+    consultor TEXT,
+    tipo_fato TEXT,
+    status_feedback TEXT,
+    data_feedback TIMESTAMPTZ,
+    observacoes_feedback TEXT,
+    gestor_registro TEXT,
+    data_hora_criacao TIMESTAMPTZ,
+    gestor_feedback TEXT,
+    data_hora_feedback TIMESTAMPTZ
+);
+
+-- 2. TABELA DE FECHAMENTOS DE TURNO / PASSAGENS DE BASTÃO
+CREATE TABLE IF NOT EXISTS public.resumos_passagem (
+    id TEXT PRIMARY KEY,
+    data TEXT NOT NULL,
+    supervisor TEXT NOT NULL,
+    o_que_funcionou TEXT,
+    o_que_fica_pendente TEXT,
+    data_hora_criacao TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    data_hora_conclusao TIMESTAMPTZ,
+    status TEXT DEFAULT 'Pendente',
+    observacao_conclusao TEXT,
+    responsavel_conclusao TEXT,
+    conteudo JSONB DEFAULT '{}'::jsonb,
+    comentarios JSONB DEFAULT '[]'::jsonb
+);
+
+-- 3. TABELA DE SOLICITAÇÕES DE DESCONTO COMERCIAL (INSIDE SALES)
+CREATE TABLE IF NOT EXISTS public.solicitacoes_desconto (
+    id TEXT PRIMARY KEY,
+    data_hora_solicitacao TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    mes_competencia TEXT NOT NULL,
+    cliente TEXT NOT NULL,
+    placa TEXT NOT NULL,
+    consultor TEXT NOT NULL,
+    supervisora TEXT NOT NULL,
+    tipo_desconto TEXT NOT NULL,
+    valor_cheio NUMERIC NOT NULL,
+    desconto_input NUMERIC NOT NULL,
+    valor_desconto_calculado NUMERIC NOT NULL,
+    percentual_desconto NUMERIC NOT NULL,
+    valor_final NUMERIC NOT NULL,
+    justificativa TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'Aguardando Aprovação',
+    data_hora_aprovacao TIMESTAMPTZ,
+    parecer TEXT,
+    aprovador TEXT,
+    tipo_registro TEXT DEFAULT 'SolicitacaoSupervisao'
+);
+
+-- 4. TABELA DE SOLICITAÇÕES DE VISTORIA VEICULAR (DANILO & LUCAS)
+CREATE TABLE IF NOT EXISTS public.solicitacoes_vistoria (
+    id TEXT PRIMARY KEY,
+    data_hora_solicitacao TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    data_vistoria TEXT,
+    horario_vistoria TEXT,
+    valor_adesao NUMERIC DEFAULT 0,
+    adesao_paga BOOLEAN DEFAULT FALSE,
+    vistoriador TEXT NOT NULL,
+    nome_associado TEXT NOT NULL,
+    contato TEXT NOT NULL,
+    localizacao_maps TEXT,
+    modelo_carro TEXT,
+    placa TEXT NOT NULL,
+    tipo_placa TEXT,
+    link_vistoria TEXT,
+    link_pagamento TEXT,
+    solicitante TEXT,
+    status TEXT NOT NULL DEFAULT 'Aguardando Vistoria',
+    data_hora_aprovacao TIMESTAMPTZ,
+    parecer TEXT,
+    aprovador TEXT,
+    motivo_reprovacao TEXT
+);
+
+-- 5. TABELA DE PONTOS DE RESTAURAÇÃO E BACKUP
+CREATE TABLE IF NOT EXISTS public.pontos_restauracao (
+    id TEXT PRIMARY KEY,
+    data_hora TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    titulo TEXT NOT NULL,
+    motivo TEXT NOT NULL,
+    autor TEXT NOT NULL,
+    contagem JSONB NOT NULL,
+    dados JSONB NOT NULL,
+    script_sql TEXT
+);
+
+-- 6. TABELA DE AUTENTICAÇÃO E AUDITORIA DE USUÁRIOS
+CREATE TABLE IF NOT EXISTS public.app_users_auth (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    username TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'supervisor',
+    cargo TEXT NOT NULL,
+    salt TEXT NOT NULL,
+    hash_sha256 TEXT NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Ajuste de constraints de validação de papéis
+DO $$
+BEGIN
+    ALTER TABLE public.app_users_auth DROP CONSTRAINT IF EXISTS app_users_auth_role_check;
+    ALTER TABLE public.app_users_auth DROP CONSTRAINT IF EXISTS users_role_check;
+EXCEPTION
+    WHEN OTHERS THEN NULL;
+END $$;
+
+ALTER TABLE public.app_users_auth 
+  ADD CONSTRAINT app_users_auth_role_check 
+  CHECK (role IN ('manager', 'supervisor', 'apoio', 'gestor', 'admin'));
+
+-- 7. ATIVAÇÃO DE ROW LEVEL SECURITY (RLS) E POLÍTICAS DE ACESSO
+ALTER TABLE public.ocorrencias ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.resumos_passagem ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.solicitacoes_desconto ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.solicitacoes_vistoria ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pontos_restauracao ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.app_users_auth ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Acesso total publico ocorrencias" ON public.ocorrencias;
+CREATE POLICY "Acesso total publico ocorrencias" ON public.ocorrencias FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Acesso total publico resumos_passagem" ON public.resumos_passagem;
+CREATE POLICY "Acesso total publico resumos_passagem" ON public.resumos_passagem FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Acesso total publico solicitacoes_desconto" ON public.solicitacoes_desconto;
+CREATE POLICY "Acesso total publico solicitacoes_desconto" ON public.solicitacoes_desconto FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Acesso total publico solicitacoes_vistoria" ON public.solicitacoes_vistoria;
+CREATE POLICY "Acesso total publico solicitacoes_vistoria" ON public.solicitacoes_vistoria FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Acesso total publico pontos_restauracao" ON public.pontos_restauracao;
+CREATE POLICY "Acesso total publico pontos_restauracao" ON public.pontos_restauracao FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Acesso total publico app_users_auth" ON public.app_users_auth;
+CREATE POLICY "Acesso total publico app_users_auth" ON public.app_users_auth FOR ALL USING (true) WITH CHECK (true);
+
+-- 8. CARGA INICIAL DE USUÁRIOS PADRÃO
+INSERT INTO public.app_users_auth (username, name, role, cargo, salt, hash_sha256)
+VALUES 
+  ('heder.santos', 'Heder Santos', 'manager', 'Gerente de Inside Sales', 'salt_user_heder_santos_2026', 'e5f1f67dff0a73343d98aa76a4b528964dd95c3e11e6d39a6c79824b11c551aa'),
+  ('debora.rodrigues', 'Débora Rodrigues', 'supervisor', 'Supervisora de Inside Sales', 'salt_user_debora_rodrigues_2026', 'ac05396f1569d51d52df65f5456402f8bb8506fc9e06214d5bddc68584cfb6aa'),
+  ('erick.thomas', 'Erick Thomas', 'apoio', 'Apoio à Supervisão', 'salt_user_erick_thomas_2026', '1fc0517bd74cf8c1514fae022764f43b85e20da4db23b64f0b0f7de0f68a7880')
+ON CONFLICT (username) DO UPDATE SET
+  name = EXCLUDED.name,
+  role = EXCLUDED.role,
+  cargo = EXCLUDED.cargo,
+  updated_at = timezone('utc'::text, now());
+`;
+  },
+
+  /**
    * Testa a conexão e permissões de Leitura e Escrita nas tabelas do Supabase
    */
   async checkConnection(): Promise<DbHealthStatus> {
@@ -422,8 +598,20 @@ export const dbService = {
       // 1. Testa leitura na tabela de ocorrências
       const { error: selectErr } = await supabase.from('ocorrencias').select('id').limit(1);
       if (selectErr) {
+        const isFetchFailed = 
+          selectErr.message?.includes('Failed to fetch') || 
+          selectErr.details?.includes('Failed to fetch') ||
+          String(selectErr).includes('Failed to fetch');
+
         let details = selectErr.details || selectErr.hint || `Código PostgREST: ${selectErr.code}`;
-        if (selectErr.code === '42P01') {
+        let code = selectErr.code || 'PGRST_ERROR';
+        let msg = selectErr.message || 'Erro ao consultar o servidor Supabase.';
+
+        if (isFetchFailed) {
+          code = 'ERR_SUPABASE_PAUSED_OR_NETWORK';
+          msg = 'Projeto Supabase Pausado ou Inacessível (TypeError: Failed to fetch)';
+          details = 'Não foi possível estabelecer conexão HTTP com o endpoint do Supabase. A causa mais comum no plano gratuito é o projeto ter sido PAUSADO por inatividade (7 dias sem requisições). Acesse o painel do Supabase (https://supabase.com/dashboard) e clique em "Restore Project".';
+        } else if (selectErr.code === '42P01') {
           details = 'A tabela "ocorrencias" NÃO EXISTE no seu banco de dados Supabase. Execute o Script SQL no Editor SQL do Supabase.';
         } else if (selectErr.code === '42501') {
           details = 'Permissão RLS negada para leitura. Execute as políticas RLS no Editor SQL do Supabase.';
@@ -431,8 +619,8 @@ export const dbService = {
 
         lastHealthStatus = {
           isConnected: false,
-          errorCode: selectErr.code || 'ERR_DATABASE_RESPONSE',
-          errorMessage: selectErr.message || 'Erro ao consultar o servidor Supabase.',
+          errorCode: code,
+          errorMessage: msg,
           errorDetails: details,
           lastChecked: new Date().toISOString()
         };
@@ -444,13 +632,49 @@ export const dbService = {
       if (passErr) {
         let details = passErr.details || passErr.hint || `Código PostgREST: ${passErr.code}`;
         if (passErr.code === '42P01') {
-          details = 'A tabela "resumos_passagem" NÃO EXISTE no seu banco de dados Supabase. Execute o Script SQL para criar ambas as tabelas.';
+          details = 'A tabela "resumos_passagem" NÃO EXISTE no seu banco de dados Supabase. Execute o Script SQL para criá-la.';
         }
 
         lastHealthStatus = {
           isConnected: false,
           errorCode: passErr.code || 'ERR_MISSING_TABLE',
           errorMessage: `A tabela 'resumos_passagem' não foi encontrada: ${passErr.message}`,
+          errorDetails: details,
+          lastChecked: new Date().toISOString()
+        };
+        return lastHealthStatus;
+      }
+
+      // 3. Testa leitura na tabela de solicitações de desconto
+      const { error: descErr } = await supabase.from('solicitacoes_desconto').select('id').limit(1);
+      if (descErr) {
+        let details = descErr.details || descErr.hint || `Código PostgREST: ${descErr.code}`;
+        if (descErr.code === '42P01') {
+          details = 'A tabela "solicitacoes_desconto" NÃO EXISTE no seu banco de dados Supabase. Execute o Script SQL para criá-la.';
+        }
+
+        lastHealthStatus = {
+          isConnected: false,
+          errorCode: descErr.code || 'ERR_MISSING_TABLE_DESCONTOS',
+          errorMessage: `A tabela de Descontos 'solicitacoes_desconto' não foi encontrada: ${descErr.message}`,
+          errorDetails: details,
+          lastChecked: new Date().toISOString()
+        };
+        return lastHealthStatus;
+      }
+
+      // 4. Testa leitura na tabela de solicitações de vistoria
+      const { error: vistErr } = await supabase.from('solicitacoes_vistoria').select('id').limit(1);
+      if (vistErr) {
+        let details = vistErr.details || vistErr.hint || `Código PostgREST: ${vistErr.code}`;
+        if (vistErr.code === '42P01') {
+          details = 'A tabela "solicitacoes_vistoria" NÃO EXISTE no seu banco de dados Supabase. Execute o Script SQL para criá-la.';
+        }
+
+        lastHealthStatus = {
+          isConnected: false,
+          errorCode: vistErr.code || 'ERR_MISSING_TABLE_VISTORIAS',
+          errorMessage: `A tabela de Vistorias 'solicitacoes_vistoria' não foi encontrada: ${vistErr.message}`,
           errorDetails: details,
           lastChecked: new Date().toISOString()
         };
@@ -465,11 +689,19 @@ export const dbService = {
         lastChecked: new Date().toISOString()
       };
     } catch (err: any) {
+      const isFetchFailed = 
+        err?.message?.includes('Failed to fetch') || 
+        String(err).includes('Failed to fetch');
+
       lastHealthStatus = {
         isConnected: false,
-        errorCode: 'ERR_NETWORK_FAILED',
-        errorMessage: err?.message || 'Falha de comunicação de rede com o servidor Supabase.',
-        errorDetails: 'Não foi possível se comunicar com o endpoint do Supabase. Verifique sua conexão de internet ou a URL do projeto.',
+        errorCode: isFetchFailed ? 'ERR_SUPABASE_PAUSED_OR_NETWORK' : 'ERR_NETWORK_FAILED',
+        errorMessage: isFetchFailed 
+          ? 'Projeto Supabase Pausado ou Inacessível (TypeError: Failed to fetch)'
+          : (err?.message || 'Falha de comunicação de rede com o servidor Supabase.'),
+        errorDetails: isFetchFailed
+          ? 'Falha ao conectar ao Supabase via fetch. Se o projeto estiver no plano gratuito e ficou 7 dias sem uso, ele foi PAUSADO. Acesse https://supabase.com/dashboard para reativá-lo, ou confirme as chaves VITE_SUPABASE_URL na Vercel.'
+          : 'Não foi possível se comunicar com o endpoint do Supabase. Verifique sua conexão de internet ou a URL do projeto.',
         lastChecked: new Date().toISOString()
       };
     }
@@ -587,11 +819,20 @@ export const dbService = {
 
         if (error) {
           console.warn('Erro ao carregar ocorrências do Supabase, fallback para LocalStorage:', error.message);
+          const isFetchFailed = 
+            error.message?.includes('Failed to fetch') || 
+            error.details?.includes('Failed to fetch') ||
+            String(error).includes('Failed to fetch');
+
           lastHealthStatus = {
             isConnected: false,
-            errorCode: error.code || 'PGRST_ERROR',
-            errorMessage: error.message || 'Erro ao consultar a tabela de ocorrências no Supabase.',
-            errorDetails: error.details || error.hint || 'Permissão negada (RLS) ou tabela inexistente.',
+            errorCode: isFetchFailed ? 'ERR_SUPABASE_PAUSED_OR_NETWORK' : (error.code || 'PGRST_ERROR'),
+            errorMessage: isFetchFailed
+              ? 'Projeto Supabase Pausado ou Inacessível (TypeError: Failed to fetch)'
+              : (error.message || 'Erro ao consultar a tabela de ocorrências no Supabase.'),
+            errorDetails: isFetchFailed
+              ? 'O cliente PostgREST não conseguiu alcançar o Supabase. No plano gratuito do Supabase, projetos sem requisições por 7 dias são PAUSADOS por inatividade. Acesse https://supabase.com/dashboard e clique em "Restore Project" para reativá-lo, ou confirme as chaves na Vercel.'
+              : (error.details || error.hint || 'Permissão negada (RLS) ou tabela inexistente.'),
             lastChecked: new Date().toISOString()
           };
           return getLocalOcorrencias();
@@ -612,11 +853,19 @@ export const dbService = {
         }
       } catch (err: any) {
         console.error('Exceção ao buscar do Supabase:', err);
+        const isFetchFailed = 
+          err?.message?.includes('Failed to fetch') || 
+          String(err).includes('Failed to fetch');
+
         lastHealthStatus = {
           isConnected: false,
-          errorCode: 'ERR_FETCH_EXCEPTION',
-          errorMessage: err?.message || 'Falha de rede ao se conectar ao Supabase.',
-          errorDetails: 'Instabilidade de conexão ou erro no cliente Supabase.',
+          errorCode: isFetchFailed ? 'ERR_SUPABASE_PAUSED_OR_NETWORK' : 'ERR_FETCH_EXCEPTION',
+          errorMessage: isFetchFailed
+            ? 'Projeto Supabase Pausado ou Inacessível (TypeError: Failed to fetch)'
+            : (err?.message || 'Falha de rede ao se conectar ao Supabase.'),
+          errorDetails: isFetchFailed
+            ? 'O cliente PostgREST não conseguiu alcançar o Supabase. No plano gratuito do Supabase, projetos sem requisições por 7 dias são PAUSADOS por inatividade. Acesse https://supabase.com/dashboard e clique em "Restore Project" para reativá-lo, ou confirme as chaves na Vercel.'
+            : 'Instabilidade de conexão ou erro no cliente Supabase.',
           lastChecked: new Date().toISOString()
         };
       }

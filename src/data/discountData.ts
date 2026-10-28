@@ -12,6 +12,7 @@ export const HIERARQUIA_EQUIPES = {
       'Aila',
       'Auryane',
       'Charlene',
+      'Débora (Supervisora)',
       'Erick',
       'Everton',
       'Felipe',
